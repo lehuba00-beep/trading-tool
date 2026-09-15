@@ -48,12 +48,61 @@ jobs:
           pip install -e ".[dev,xlsx]"
       - name: Exe bauen
         run: pyinstaller build/trading_tool.spec --noconfirm --clean
-      - name: Startversuch
-        # Belegt, dass die gebaute Exe startet und die mitgelieferten Dateien
-        # findet - ein Build, der nur fehlerfrei durchlaeuft, sagt wenig.
+      - name: Startversuch Kommandozeile
+        # Ein Build, der nur fehlerfrei durchlaeuft, sagt wenig. Jeder Befehl
+        # wird einzeln geprueft - in PowerShell propagiert sonst nur der letzte
+        # seinen Exit-Code, und ein Fehlschlag davor bliebe unsichtbar.
+        shell: pwsh
         run: |
-          dist\TradingTool\TradingTool.exe universe
-          dist\TradingTool\TradingTool.exe rules
+          $ErrorActionPreference = "Stop"
+          $ausgabe = & dist\TradingTool\TradingTool.exe universe 2>&1 | Out-String
+          Write-Host $ausgabe
+          if ($LASTEXITCODE -ne 0) { throw "universe endete mit $LASTEXITCODE" }
+          if ($ausgabe -notmatch "Instrumente verwendbar") { throw "universe ohne erwartete Ausgabe" }
+
+          $ausgabe = & dist\TradingTool\TradingTool.exe rules 2>&1 | Out-String
+          Write-Host $ausgabe
+          if ($LASTEXITCODE -ne 0) { throw "rules endete mit $LASTEXITCODE" }
+          if ($ausgabe -notmatch "Regelbausteine") { throw "rules ohne erwartete Ausgabe" }
+
+      - name: Startversuch Oberflaeche
+        # Der eigentliche Anwendungsfall. universe und rules fassen FastAPI,
+        # uvicorn und die Vorlagen nicht an - die Exe koennte die
+        # Kommandozeile bedienen und beim Start der Oberflaeche abstuerzen.
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $env:TRADING_TOOL_DATA_DIR = "$env:RUNNER_TEMP\tt-daten"
+          $prozess = Start-Process -FilePath "dist\TradingTool\TradingTool.exe" `
+            -ArgumentList "serve","--port","8765","--no-browser" -PassThru `
+            -RedirectStandardOutput server-out.log -RedirectStandardError server-err.log
+
+          $erreichbar = $false
+          foreach ($versuch in 1..30) {
+            Start-Sleep -Seconds 2
+            if ($prozess.HasExited) { break }
+            try {
+              $antwort = Invoke-WebRequest -Uri "http://127.0.0.1:8765/" -UseBasicParsing -TimeoutSec 5
+              if ($antwort.StatusCode -eq 200 -and $antwort.Content -match "Keine Anlageberatung") {
+                $erreichbar = $true; break
+              }
+            } catch { }
+          }
+
+          if ($erreichbar) {
+            # Vorlagen, Stylesheet und SVG-Chart einzeln anfassen: Bei
+            # PyInstaller fehlen genau solche Dateien gern im Bundle.
+            foreach ($pfad in @("/screener/kurz_pullback", "/universe", "/einstellungen",
+                                "/static/app.css", "/static/poll.js")) {
+              $r = Invoke-WebRequest -Uri "http://127.0.0.1:8765$pfad" -UseBasicParsing -TimeoutSec 10
+              if ($r.StatusCode -ne 200) { $erreichbar = $false; Write-Host "FEHLT: $pfad" }
+            }
+          }
+
+          Write-Host "--- Ausgabe der Anwendung ---"
+          Get-Content server-out.log, server-err.log -ErrorAction SilentlyContinue
+          Stop-Process -Id $prozess.Id -Force -ErrorAction SilentlyContinue
+          if (-not $erreichbar) { throw "Oberflaeche nicht erreichbar oder unvollstaendig" }
       - name: Startanleitung beilegen
         run: Copy-Item docs\WINDOWS.md dist\TradingTool\LIESMICH.md
         shell: pwsh
