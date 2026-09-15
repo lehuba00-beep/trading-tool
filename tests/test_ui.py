@@ -192,3 +192,24 @@ def test_chart_kommt_mit_leerer_reihe_klar():
     import pandas as pd
 
     assert "Keine Kursdaten" in candlestick(pd.DataFrame())
+
+
+def test_hintergrundlauf_wird_beim_beenden_gestoppt(seeded, settings):
+    """Ohne geordnetes Beenden bleibt je Anwendungsinstanz ein Thread stehen -
+    und der Abbau haengt an einem noch laufenden Auftrag."""
+    import threading
+
+    vorher = threading.active_count()
+    app = create_app(settings)
+    with TestClient(app) as client:
+        client.post("/screener/swing/run")
+    assert not app.state.app.jobs._worker.is_alive()
+    assert threading.active_count() <= vorher, "Arbeitsthread ueberlebt das Beenden"
+
+
+def test_eingereihter_auftrag_nach_dem_stopp_wird_abgelehnt(settings):
+    from trading_tool.ui.jobs import JobRunner
+
+    runner = JobRunner()
+    runner.stop()
+    assert runner.submit("x", "X", lambda progress: {}) is False

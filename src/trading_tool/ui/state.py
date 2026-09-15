@@ -114,7 +114,11 @@ class AppState:
         return self.jobs.submit(f"backtest:{name}", f"Trefferquote {strategy.label}", task)
 
     def close(self) -> None:
+        # Reihenfolge zaehlt: erst keine neuen Auftraege mehr zulassen, dann
+        # den laufenden abwarten, erst danach die Datenbank schliessen. Sonst
+        # zieht man einem laufenden Screening die Verbindung unter den Fuessen weg.
         self.scheduler.shutdown()
+        self.jobs.stop()
         self.conn.close()
 
 

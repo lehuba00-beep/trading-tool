@@ -51,3 +51,7 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Bleibt ein Test haengen, werden nach zwei Minuten alle Thread-Stapel
+# ausgegeben. Genau daran liess sich ein blockierender Arbeitsthread
+# erkennen, der lokal nie aufgefallen waere.
+faulthandler_timeout = 120

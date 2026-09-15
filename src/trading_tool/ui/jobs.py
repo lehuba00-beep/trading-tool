@@ -36,14 +36,35 @@ class JobState:
         return int(self.current / self.total * 100) if self.total else 0
 
 
+# Kennzeichen zum Beenden des Arbeitsthreads. Ein eigenes Objekt statt None,
+# damit es sich nicht mit einem echten Auftrag verwechseln laesst.
+_STOP = object()
+
+
 class JobRunner:
     def __init__(self) -> None:
-        self._queue: queue.Queue[tuple[str, str, Callable[[Callable], dict]]] = queue.Queue()
+        self._queue: queue.Queue = queue.Queue()
         self._lock = threading.Lock()
         self.state = JobState()
         self.history: list[JobState] = []
+        self._stopping = False
         self._worker = threading.Thread(target=self._loop, daemon=True, name="job-runner")
         self._worker.start()
+
+    def stop(self, timeout: float = 10.0) -> None:
+        """Arbeitsthread geordnet beenden.
+
+        Ohne das bleibt je Anwendungsinstanz ein Thread fuer immer in
+        ``queue.get()`` stehen. In der laufenden Anwendung gibt es nur eine
+        Instanz, im Testlauf entstehen daraus jedoch Dutzende - und der
+        Abbau der Anwendung haengt.
+        """
+        with self._lock:
+            if self._stopping:
+                return
+            self._stopping = True
+        self._queue.put(_STOP)
+        self._worker.join(timeout)
 
     @property
     def busy(self) -> bool:
@@ -57,6 +78,8 @@ class JobRunner:
     def submit(self, name: str, label: str, fn: Callable[[Callable], dict]) -> bool:
         """Auftrag einreihen. Doppelte Auftraege werden verworfen."""
         with self._lock:
+            if self._stopping:
+                return False
             if self.state.running and self.state.name == name:
                 return False
         self._queue.put((name, label, fn))
@@ -70,7 +93,11 @@ class JobRunner:
 
     def _loop(self) -> None:
         while True:
-            name, label, fn = self._queue.get()
+            item = self._queue.get()
+            if item is _STOP:
+                self._queue.task_done()
+                return
+            name, label, fn = item
             with self._lock:
                 self.state = JobState(
                     name=name, label=label, running=True, started_at=datetime.now(),
