@@ -1,0 +1,27 @@
+# Laufzeitdaten
+data/
+*.sqlite
+*.sqlite-journal
+*.parquet
+config/settings.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Build
+build/dist/
+dist/
+*.spec.bak
+
+# IDE / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
