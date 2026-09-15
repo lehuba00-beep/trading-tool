@@ -3,7 +3,20 @@
 Reihenfolge nach Auswirkung auf die Architektur. Zu jedem Punkt steht ein
 Vorschlag – wo nichts entschieden wird, wird der Vorschlag umgesetzt.
 
-## A. Entscheidungsrelevant vor Implementierungsbeginn
+## A. Entschieden (2026-09-15)
+
+| Punkt | Entscheidung |
+|---|---|
+| A1 Oberfläche | **Lokale Web-UI** – FastAPI + Jinja2 + HTMX, Bindung auf `127.0.0.1`, Launcher öffnet den Browser |
+| A2 Kursdaten | **yfinance primär, Stooq als Fallback**, Provider-Schicht bleibt austauschbar |
+| A3 Derivate v1 | **Stufe 1** – Signale auf Basiswerten, dazu Hebel-/Barrieren-Rechner, Produkttyp-Hinweise und Emittenten-Deeplinks; keine Zertifikatskurse |
+| A4 Universum | **DE/EU + US-Auswahl, Zielgröße ca. 300 Titel** – DAX, MDAX, TecDAX, EURO STOXX 50, Nasdaq-100, liquide S&P-500-Werte, gängige ETFs |
+| A5 Richtung | Regelwerk richtungsfähig, v1 Long-Profile, Short in M4 |
+
+Die ursprüngliche Fragestellung zu diesen Punkten bleibt unten als Begründung
+stehen.
+
+## A'. Ursprüngliche Fragestellung
 
 **A1 – Oberfläche.** Lokale Web-UI (FastAPI + HTMX, Browser auf `127.0.0.1`)
 oder native Desktop-GUI (PySide6)?
