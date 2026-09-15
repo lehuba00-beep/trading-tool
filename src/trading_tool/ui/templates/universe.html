@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Universum{% endblock %}
+{% block content %}
+<h1>Universum</h1>
+<p class="muted">
+  {{ total }} Eintraege. Der Status sagt, wie gut die Handelbarkeit bei Trade
+  Republic belegt ist &ndash; <strong>angenommen</strong> heisst: aus einer Indexliste
+  uebernommen, aber nicht einzeln geprueft. Vor einer Order in der TR-App
+  nachsehen und hier auf <em>geprueft</em> stellen.
+</p>
+
+{% if report and report.errors %}
+<div class="banner warn"><strong>Liste:</strong> {{ report.summary() }}</div>
+{% endif %}
+
+<form method="get" class="toolbar">
+  <input type="text" name="q" value="{{ q }}" placeholder="Name, ISIN oder Ticker">
+  <select name="status">
+    <option value="">alle Status</option>
+    {% for s in ['verified','assumed','unavailable','unknown'] %}
+    <option value="{{ s }}" {{ 'selected' if status == s }}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <select name="klasse">
+    <option value="">alle Klassen</option>
+    {% for k in ['stock','etf','index'] %}
+    <option value="{{ k }}" {{ 'selected' if klasse == k }}>{{ k }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Filtern</button>
+</form>
+
+<table class="grid">
+  <thead><tr><th>Titel</th><th>ISIN</th><th>Ticker</th><th>Klasse</th><th>Waehrung</th>
+    <th>TR-Status</th><th>geprueft am</th><th>Quelle</th><th></th></tr></thead>
+  <tbody>
+  {% for i in instruments %}
+    <tr>
+      <td><a href="/instrument/{{ i.isin }}">{{ i.name }}</a></td>
+      <td class="muted small">{{ i.isin }}</td>
+      <td class="muted small">{{ i.ticker_yahoo }}</td>
+      <td>{{ i.asset_class.value }}</td>
+      <td>{{ i.currency }}</td>
+      <td><span class="tag st-{{ i.tr_status.value }}">{{ i.tr_status.label }}</span></td>
+      <td class="muted small">
+        {{ i.tr_checked_at.strftime('%d.%m.%Y') if i.tr_checked_at else '-' }}
+        {% if i.tr_checked_at and i.tr_checked_at < stale_cutoff %}
+          <span class="tag prov" title="Pruefung aelter als das eingestellte Intervall">veraltet</span>
+        {% endif %}
+      </td>
+      <td class="muted small">{{ i.source }}</td>
+      <td class="nowrap">
+        <form method="post" action="/universe/{{ i.isin }}/status" class="inline">
+          <input type="hidden" name="status" value="verified">
+          <input type="hidden" name="zurueck" value="/universe?q={{ q }}&status={{ status }}&klasse={{ klasse }}">
+          <button class="link" type="submit" title="Bei Trade Republic gesehen">geprueft</button>
+        </form>
+        <form method="post" action="/universe/{{ i.isin }}/status" class="inline">
+          <input type="hidden" name="status" value="unavailable">
+          <input type="hidden" name="zurueck" value="/universe?q={{ q }}&status={{ status }}&klasse={{ klasse }}">
+          <button class="link" type="submit" title="Bei Trade Republic nicht handelbar">nein</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,19 @@
+# Produktfinder der Emittenten von Hebelprodukten.
+#
+# Diese Adressen aendern sich gelegentlich. Sie stehen deshalb hier und nicht
+# im Code - bei einem toten Link einfach die Zeile anpassen.
+issuers:
+  - name: HSBC
+    url: https://www.hsbc-zertifikate.de/
+  - name: Vontobel
+    url: https://certificates.vontobel.com/DE/
+  - name: Societe Generale
+    url: https://www.sg-zertifikate.de/
+  - name: BNP Paribas
+    url: https://www.derivate.bnpparibas.com/
+  - name: UniCredit onemarkets
+    url: https://www.onemarkets.de/
+  - name: DZ Bank
+    url: https://www.dzbank-derivate.de/
+  - name: Morgan Stanley
+    url: https://www.morganstanley-zertifikate.de/

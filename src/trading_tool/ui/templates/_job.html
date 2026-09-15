@@ -1,0 +1,18 @@
+{% if job.running %}
+<div class="job running">
+  <span class="spinner"></span>
+  <strong>{{ job.label }}</strong>
+  <span class="muted">{{ job.message }}</span>
+  <progress value="{{ job.current }}" max="{{ job.total or 1 }}"></progress>
+  <span class="muted">{{ job.current }} / {{ job.total }}</span>
+  {% if pending %}<span class="muted">(+{{ pending }} in Warteschlange)</span>{% endif %}
+</div>
+{% elif job.error %}
+<div class="job error"><strong>{{ job.label }}</strong> fehlgeschlagen: {{ job.error }}</div>
+{% elif job.finished_at %}
+<div class="job done">
+  <strong>{{ job.label }}</strong> abgeschlossen um {{ job.finished_at.strftime('%H:%M:%S') }}
+  {% if job.result.get('treffer') is not none %} &ndash; {{ job.result['treffer'] }} Treffer{% endif %}
+  {% if job.result.get('signale') is not none %} &ndash; {{ job.result['signale'] }} Signale ausgewertet{% endif %}
+</div>
+{% endif %}

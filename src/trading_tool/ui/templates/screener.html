@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ strategy.label }}{% endblock %}
+{% block content %}
+<h1>{{ strategy.label }}</h1>
+<p class="muted">{{ strategy.description }}</p>
+
+<div class="toolbar">
+  <form method="post" action="/screener/{{ name }}/run">
+    <button type="submit">Jetzt durchsuchen</button>
+  </form>
+  <form method="post" action="/screener/{{ name }}/run">
+    <input type="hidden" name="nur_watchlist" value="1">
+    <button type="submit" class="secondary">Nur Watchlist</button>
+  </form>
+  <a class="btn secondary" href="/export/{{ name }}.csv">CSV</a>
+  <a class="btn secondary" href="/export/{{ name }}.xlsx">Excel</a>
+  <a class="btn secondary" href="/trefferquote/{{ name }}">Trefferquote</a>
+  <a class="btn secondary" href="/screener/{{ name }}?sort={{ sort }}&nur_geprueft={{ 0 if nur_geprueft else 1 }}">
+    {{ 'Alle anzeigen' if nur_geprueft else 'Nur TR-geprueft' }}</a>
+</div>
+
+{% if run %}
+<p class="muted">
+  Lauf vom {{ run.finished_at.strftime('%d.%m.%Y %H:%M') if run.finished_at }},
+  {{ run.n_instruments }} Titel geprueft, Quelle {{ run.provider }}.
+  {% if run.message %}{{ run.message }}.{% endif %}
+  Mindest-Score {{ strategy.min_score|zahl(0) }}.
+</p>
+{% endif %}
+
+{% if signals %}
+<table class="grid">
+  <thead>
+    <tr>
+      <th><a href="?sort=score">Score</a></th>
+      <th><a href="?sort=name">Titel</a></th>
+      <th>Kurs (EUR)</th>
+      <th><a href="?sort=perf_20d">20 Tage</a></th>
+      <th><a href="?sort=abstand_hoch">zum 52W-Hoch</a></th>
+      <th>ATR %</th>
+      <th>Stop</th>
+      <th>Ziel</th>
+      <th><a href="?sort=umsatz">Umsatz</a></th>
+      <th>Ausgeloeste Regeln</th>
+      <th>TR</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for s in signals %}
+    <tr>
+      <td><span class="score">{{ s.score|zahl(0) }}</span>
+        {% if s.provisional %}<span class="tag prov" title="Beruht auf einem noch nicht abgeschlossenen Tagesbalken">vorlaeufig</span>{% endif %}</td>
+      <td><a href="/instrument/{{ s.isin }}?strategie={{ name }}">{{ s.name }}</a>
+        <br><span class="muted small">{{ s.isin }}</span></td>
+      <td class="num">{{ s.metrics.get('kurs_eur')|zahl }}</td>
+      <td class="num {{ 'pos' if (s.metrics.get('perf_20d_pct') or 0) > 0 else 'neg' }}">
+        {{ s.metrics.get('perf_20d_pct')|zahl(1) }} %</td>
+      <td class="num">{{ s.metrics.get('abstand_52w_hoch_pct')|zahl(1) }} %</td>
+      <td class="num">{{ s.metrics.get('atr_pct')|zahl(1) }}</td>
+      <td class="num">{{ s.metrics.get('stop')|zahl }}</td>
+      <td class="num">{{ s.metrics.get('ziel')|zahl }}</td>
+      <td class="num">{{ s.metrics.get('umsatz_20d_eur')|geld }}</td>
+      <td class="rules">
+        {% for label in s.triggered_labels %}<span class="tag hit">{{ label }}</span>{% endfor %}
+      </td>
+      <td><span class="tag st-{{ s.tr_status.value }}">{{ s.tr_status.label }}</span></td>
+      <td>
+        {% if s.isin in watched %}
+          <form method="post" action="/watchlist/remove">
+            <input type="hidden" name="isin" value="{{ s.isin }}">
+            <input type="hidden" name="zurueck" value="/screener/{{ name }}">
+            <button class="link" type="submit" title="Von der Watchlist entfernen">&minus;</button>
+          </form>
+        {% else %}
+          <form method="post" action="/watchlist/add">
+            <input type="hidden" name="isin" value="{{ s.isin }}">
+            <input type="hidden" name="zurueck" value="/screener/{{ name }}">
+            <button class="link" type="submit" title="Auf die Watchlist">+</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Keine Treffer. Das ist ein Ergebnis, kein Fehler &ndash; die
+Pflichtfilter dieses Profils sind bewusst streng.</p>
+{% endif %}
+{% endblock %}

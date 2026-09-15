@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen{% endblock %}
+{% block content %}
+<h1>Einstellungen</h1>
+
+<div class="split">
+<section class="card">
+  <h2>Kursdaten</h2>
+  <table class="kv">
+    <tr><th>Quellenkette</th><td>{{ providers|join(' &rarr; ')|safe }}</td></tr>
+    <tr><th>Basiswaehrung</th><td>{{ settings.screening.base_currency }}</td></tr>
+    <tr><th>Historie</th><td>{{ settings.provider.history_days }} Kalendertage</td></tr>
+    <tr><th>Pause zwischen Abrufen</th><td>{{ settings.provider.request_pause_seconds }} s</td></tr>
+  </table>
+  <p class="muted small">
+    Alle Kurse werden nach {{ settings.screening.base_currency }} umgerechnet &ndash;
+    also genau die Entwicklung, die im Depot ankommt. Rohkurse bleiben in
+    Originalwaehrung gespeichert.
+  </p>
+</section>
+
+<section class="card">
+  <h2>Zeitsteuerung</h2>
+  <table class="kv">
+    <tr><th>Aktiv</th><td>{{ 'ja' if settings.schedule.enabled else 'nein' }}</td></tr>
+    <tr><th>Laufzeiten</th><td>{{ settings.schedule.times|join(', ') }}</td></tr>
+    <tr><th>Zeitzone</th><td>{{ settings.schedule.timezone }}</td></tr>
+    <tr><th>Naechste Laeufe</th><td>{{ next_runs|join('<br>')|safe or '-' }}</td></tr>
+  </table>
+  <p class="muted small">
+    09:30 nach Xetra-Eroeffnung (US-Vortag final), 14:00 vor US-Handelsbeginn,
+    22:30 nach US-Schluss &ndash; erst dann sind alle Tagesbalken endgueltig.
+    Signale aus den ersten beiden Laeufen sind als <em>vorlaeufig</em> markiert.
+  </p>
+</section>
+</div>
+
+<section class="card wide">
+  <h2>Ablage</h2>
+  <table class="kv">
+    <tr><th>Datenverzeichnis</th><td><code>{{ settings.data_dir }}</code></td></tr>
+    <tr><th>Datenbank</th><td><code>{{ settings.db_path }}</code></td></tr>
+    <tr><th>Strategien</th><td><code>{{ settings.strategy_dir }}</code></td></tr>
+    <tr><th>Universumsliste</th><td><code>{{ settings.universe_path }}</code></td></tr>
+    <tr><th>Exporte</th><td><code>{{ settings.export_dir }}</code></td></tr>
+  </table>
+  <p class="muted small">
+    Die Einstellungen stehen in <code>settings.yaml</code> im Datenverzeichnis.
+    Aenderungen dort werden beim naechsten Start uebernommen. Strategien lassen
+    sich als YAML anpassen, ohne das Programm neu zu bauen.
+  </p>
+</section>
+
+{% if history %}
+<section class="card wide">
+  <h2>Letzte Laeufe</h2>
+  <table class="grid">
+    <thead><tr><th>Lauf</th><th>Start</th><th>Ende</th><th>Ergebnis</th></tr></thead>
+    <tbody>
+    {% for h in history %}
+      <tr><td>{{ h.label }}</td>
+        <td class="muted">{{ h.started_at.strftime('%d.%m. %H:%M:%S') if h.started_at }}</td>
+        <td class="muted">{{ h.finished_at.strftime('%d.%m. %H:%M:%S') if h.finished_at }}</td>
+        <td>{% if h.error %}<span class="neg">{{ h.error }}</span>
+            {% else %}{{ h.result }}{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

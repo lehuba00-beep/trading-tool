@@ -1,0 +1,59 @@
+# Kurzfristig, 1-5 Handelstage: Ruecksetzer im intakten Aufwaertstrend.
+#
+# Gegenthese zum Ausbruchsprofil: hier wird Schwaeche gekauft, dort Staerke.
+# Die beiden Ansaetze sind bewusst getrennt - in einem gemeinsamen Score
+# wuerden sie sich gegenseitig neutralisieren.
+name: kurz_pullback
+label: "Kurzfristig - Ruecksetzer"
+horizon: kurzfristig
+direction: long
+description: >
+  Sucht kurzfristig ueberverkaufte Titel, deren uebergeordneter Trend intakt
+  ist. Typische Haltedauer 1-5 Handelstage.
+
+universe_filter:
+  asset_class: [stock, etf]
+  tr_status: [verified, assumed]
+  min_avg_turnover_eur: 1000000
+  min_history_days: 250
+
+rules:
+  # Pflicht: nur mit dem uebergeordneten Trend. Ein Ruecksetzer im Abwaerts-
+  # trend ist kein Ruecksetzer, sondern eine Fortsetzung.
+  - type: above_ma
+    params: {ma: sma, period: 200}
+    required: true
+  # Pflicht: Bewegungsspielraum. Zu ruhig heisst kein Weg, zu wild heisst der
+  # Stop wird von normalem Rauschen ausgeloest.
+  - type: atr_pct_between
+    params: {period: 14, low: 1.0, high: 8.0}
+    required: true
+
+  - type: rsi_below
+    params: {period: 2, threshold: 10}
+    weight: 30
+  - type: pullback_from_high
+    params: {period: 252, min_pct: 3.0, max_pct: 15.0}
+    weight: 20
+  - type: rsi_between
+    params: {period: 14, low: 25, high: 45}
+    weight: 15
+  - type: ma_slope_up
+    params: {ma: sma, period: 50, lookback: 21}
+    weight: 15
+  # Bestaetigung, dass die Abwaertsbewegung gestoppt hat
+  - type: close_above_open
+    params: {days: 1}
+    weight: 10
+  - type: relative_volume_above
+    params: {lookback: 20, factor: 1.2}
+    weight: 10
+
+scoring:
+  min_score: 55
+
+risk:
+  stop_atr_factor: 2.0
+  target_atr_factor: 3.0
+  atr_period: 14
+  max_holding_days: 5

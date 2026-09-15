@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Trading-Tool{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/poll.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">Trading-Tool</a>
+  <nav>
+    {% for key, s in strategies.items() %}
+      <a href="/screener/{{ key }}" class="{{ 'active' if name is defined and name == key }}">{{ s.label }}</a>
+    {% endfor %}
+    <a href="/watchlist">Watchlist</a>
+    <a href="/universe">Universum</a>
+    <a href="/einstellungen">Einstellungen</a>
+  </nav>
+</header>
+
+<div id="jobbar" hx-get="/jobs/status" hx-trigger="load, every 2s" hx-swap="innerHTML">
+  {% include "_job.html" %}
+</div>
+
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<footer>
+  <p><strong>Keine Anlageberatung.</strong> Dieses Werkzeug zeigt Kennzahlen und
+  regelbasierte Signale. Es spricht keine Empfehlung aus, beruecksichtigt keine
+  persoenlichen Verhaeltnisse und hat keine Verbindung zu einem Broker. Jede
+  Handelsentscheidung trifft ausschliesslich der Nutzer. Historische Signale
+  sagen nichts ueber kuenftige Kursentwicklungen aus.</p>
+  <p class="muted">Kursdaten ohne Gewaehr. Handelbarkeit bei Trade Republic vor
+  jeder Order in der App pruefen.</p>
+</footer>
+</body>
+</html>

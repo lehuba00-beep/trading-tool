@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Watchlist{% endblock %}
+{% block content %}
+<h1>Watchlist</h1>
+<form method="post" action="/watchlist/add" class="toolbar">
+  <input type="text" name="isin" placeholder="ISIN aus dem Universum" required>
+  <button type="submit">Hinzufuegen</button>
+  <span class="muted">Nur Titel aus dem Universum, die nicht als &bdquo;nicht handelbar&ldquo; markiert sind.</span>
+</form>
+
+{% if entries %}
+<table class="grid">
+  <thead><tr><th>Titel</th><th>ISIN</th><th>Klasse</th><th>TR</th><th>aufgenommen</th><th></th></tr></thead>
+  <tbody>
+  {% for e in entries %}
+    <tr>
+      <td><a href="/instrument/{{ e.isin }}">{{ e.name or e.isin }}</a></td>
+      <td class="muted small">{{ e.isin }}</td>
+      <td>{{ e.asset_class }}</td>
+      <td><span class="tag st-{{ e.tr_status }}">{{ e.tr_status }}</span></td>
+      <td class="muted">{{ e.added_at }}</td>
+      <td>
+        <form method="post" action="/watchlist/remove">
+          <input type="hidden" name="isin" value="{{ e.isin }}">
+          <button class="link" type="submit">entfernen</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Die Watchlist ist leer. Titel lassen sich aus jeder Trefferliste
+mit dem Plus-Zeichen aufnehmen.</p>
+{% endif %}
+{% endblock %}

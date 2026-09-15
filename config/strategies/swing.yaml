@@ -1,0 +1,53 @@
+# Kurzfristig, 1-4 Wochen.
+name: swing
+label: "Swing - 1 bis 4 Wochen"
+horizon: swing
+direction: long
+benchmark: IDX_MSCIWORLD
+description: >
+  Sucht Titel in einem bestaetigten Aufwaertstrend mit frischem
+  Momentumwechsel. Typische Haltedauer 1-4 Wochen.
+
+universe_filter:
+  asset_class: [stock, etf]
+  tr_status: [verified, assumed]
+  min_avg_turnover_eur: 750000
+  min_history_days: 250
+
+rules:
+  - type: above_ma
+    params: {ma: sma, period: 200}
+    required: true
+  # Trennt Trend von Seitwaerts. Ohne diesen Filter liefern die
+  # Trendfolgeregeln in Seitwaertsphasen laufend Fehlsignale.
+  - type: adx_above
+    params: {period: 14, threshold: 18}
+    required: true
+
+  - type: relative_strength_above
+    params: {period: 63, threshold: 0}
+    weight: 20
+  - type: macd_cross_up
+    params: {fast: 12, slow: 26, signal: 9, within_days: 10}
+    weight: 20
+  - type: distance_to_high_below
+    params: {period: 252, max_pct: 12.0}
+    weight: 20
+  - type: rsi_above
+    params: {period: 14, threshold: 50}
+    weight: 15
+  - type: roc_above
+    params: {period: 21, threshold: 0}
+    weight: 15
+  - type: above_ma
+    params: {ma: ema, period: 20}
+    weight: 10
+
+scoring:
+  min_score: 60
+
+risk:
+  stop_atr_factor: 2.5
+  target_atr_factor: 4.0
+  atr_period: 14
+  max_holding_days: 20

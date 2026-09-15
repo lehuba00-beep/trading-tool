@@ -1,0 +1,64 @@
+# Baut die Windows-Anwendung.
+#
+# Hintergrund: PyInstaller kann nicht plattformuebergreifend bauen - eine
+# Windows-Exe entsteht nur auf einem Windows-System. Wer keine
+# Python-Installation auf dem Zielrechner hat, laedt das Ergebnis dieses
+# Laufs herunter: Actions -> Lauf auswaehlen -> Artefakt "TradingTool-windows".
+
+name: Windows-Build
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore: ["docs/**", "**/*.md"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Abhaengigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,xlsx]"
+      - name: Linter
+        run: ruff check src tests
+      - name: Tests
+        run: pytest -q
+      - name: Universumsliste pruefen
+        run: python -m trading_tool universe
+
+  build:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Abhaengigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,xlsx]"
+      - name: Exe bauen
+        run: pyinstaller build/trading_tool.spec --noconfirm --clean
+      - name: Startversuch
+        # Belegt, dass die gebaute Exe startet und die mitgelieferten Dateien
+        # findet - ein Build, der nur fehlerfrei durchlaeuft, sagt wenig.
+        run: |
+          dist\TradingTool\TradingTool.exe universe
+          dist\TradingTool\TradingTool.exe rules
+      - name: Startanleitung beilegen
+        run: Copy-Item docs\WINDOWS.md dist\TradingTool\LIESMICH.md
+        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TradingTool-windows
+          path: dist/TradingTool
+          retention-days: 30

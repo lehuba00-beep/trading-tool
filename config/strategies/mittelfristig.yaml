@@ -1,0 +1,53 @@
+# Mittelfristig, 1-6 Monate.
+name: mittelfristig
+label: "Mittelfristig - 1 bis 6 Monate"
+horizon: mittelfristig
+direction: long
+benchmark: IDX_MSCIWORLD
+description: >
+  Sucht Titel mit sauberer Trendstruktur und relativer Staerke gegenueber dem
+  Gesamtmarkt. Typische Haltedauer 1-6 Monate.
+
+universe_filter:
+  asset_class: [stock, etf]
+  tr_status: [verified, assumed]
+  min_avg_turnover_eur: 500000
+  min_history_days: 260
+
+rules:
+  - type: ma_stack
+    params: {ma: sma, periods: [50, 200]}
+    required: true
+  - type: adx_above
+    params: {period: 14, threshold: 20}
+    required: true
+
+  # Den Index zu schlagen ist der eigentliche Zweck der Titelauswahl - deshalb
+  # traegt die relative Staerke hier das groesste Gewicht.
+  - type: relative_strength_above
+    params: {period: 126, threshold: 0}
+    weight: 25
+  - type: distance_to_high_below
+    params: {period: 252, max_pct: 15.0}
+    weight: 20
+  - type: relative_strength_above
+    params: {period: 63, threshold: 0}
+    weight: 15
+  - type: ma_slope_up
+    params: {ma: sma, period: 200, lookback: 42}
+    weight: 15
+  - type: ma_cross_up
+    params: {ma: sma, fast: 50, slow: 200, within_days: 60}
+    weight: 15
+  - type: macd_above_signal
+    params: {fast: 12, slow: 26, signal: 9}
+    weight: 10
+
+scoring:
+  min_score: 60
+
+risk:
+  stop_atr_factor: 3.0
+  target_atr_factor: 6.0
+  atr_period: 14
+  max_holding_days: 126

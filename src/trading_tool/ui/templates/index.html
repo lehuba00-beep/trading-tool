@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Uebersicht</h1>
+
+{% if report and report.errors %}
+<div class="banner warn">
+  <strong>Universumsliste:</strong> {{ report.summary() }}.
+  Fehlerhafte Zeilen wurden uebersprungen &ndash; Details im Protokoll.
+</div>
+{% endif %}
+
+<div class="toolbar">
+  <form method="post" action="/screener/alle/run">
+    <button type="submit">Alle Strategien jetzt durchsuchen</button>
+  </form>
+  <span class="muted">
+    Gespeichert: {{ coverage.instruments }} Titel, {{ coverage.bars }} Tagesbalken.
+    {% if next_runs %}Naechste geplante Laeufe: {{ next_runs|join(', ') }}.{% endif %}
+  </span>
+</div>
+
+<div class="cards">
+{% for card in cards %}
+  <section class="card">
+    <h2><a href="/screener/{{ card.name }}">{{ card.strategy.label }}</a></h2>
+    <p class="muted">{{ card.strategy.description }}</p>
+    {% if card.run %}
+      <p class="stat"><strong>{{ card.run.n_hits }}</strong> Treffer
+        <span class="muted">von {{ card.run.n_instruments }} geprueften Titeln</span></p>
+      <p class="muted">Stand {{ card.run.finished_at.strftime('%d.%m.%Y %H:%M') if card.run.finished_at }}</p>
+      <ol class="mini">
+        {% for s in card.signals[:5] %}
+          <li><a href="/instrument/{{ s.isin }}?strategie={{ card.name }}">{{ s.name }}</a>
+            <span class="score">{{ s.score|zahl(0) }}</span>
+            {% if s.provisional %}<span class="tag prov">vorlaeufig</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p class="muted">Noch kein Lauf. </p>
+    {% endif %}
+    <div class="row">
+      <form method="post" action="/screener/{{ card.name }}/run">
+        <button type="submit">Durchsuchen</button>
+      </form>
+      <a class="btn secondary" href="/trefferquote/{{ card.name }}">Trefferquote</a>
+    </div>
+  </section>
+{% endfor %}
+</div>
+
+{% if stale %}
+<section class="card wide">
+  <h2>Pruefung veraltet</h2>
+  <p class="muted">
+    {{ stale_total }} Titel wurden vor mehr als
+    {{ (stale_total and '') }}einem halben Jahr zuletzt bei Trade Republic geprueft.
+    Produkte verschwinden aus dem Handel &ndash; eine Liste ohne Verfallsdatum wird
+    still falsch.
+  </p>
+  <ul class="chips">
+    {% for i in stale %}<li><a href="/instrument/{{ i.isin }}">{{ i.name }}</a></li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,56 @@
+# Langfristig, ab 6 Monaten.
+#
+# Bewusst ohne Fundamentaldaten: kostenlos verfuegbare Kennzahlen sind in
+# Abdeckung und Aktualitaet schwach und teilweise schlicht falsch. Lieber eine
+# Handvoll belastbarer Kursgroessen als viele unzuverlaessige Fundamentalwerte.
+name: langfristig
+label: "Langfristig - ab 6 Monaten"
+horizon: langfristig
+direction: long
+benchmark: IDX_MSCIWORLD
+description: >
+  Sucht Titel mit langfristigem Aufwaertstrend und Momentum ueber zwoelf
+  Monate. Haltedauer ab sechs Monaten.
+
+universe_filter:
+  asset_class: [stock, etf]
+  tr_status: [verified, assumed]
+  min_avg_turnover_eur: 500000
+  min_history_days: 400
+
+rules:
+  - type: above_ma
+    params: {ma: sma, period: 200}
+    required: true
+  # Ein Kurs ueber einer fallenden 200-Tage-Linie ist etwas anderes als einer
+  # ueber einer steigenden.
+  - type: ma_slope_up
+    params: {ma: sma, period: 200, lookback: 63}
+    required: true
+
+  # Der ausgelassene letzte Monat entfernt die kurzfristige Umkehrbewegung,
+  # die das reine 12-Monats-Momentum systematisch verwaessert.
+  - type: momentum_12_1_above
+    params: {months: 12, skip_months: 1, threshold: 0}
+    weight: 30
+  - type: relative_strength_above
+    params: {period: 252, threshold: 0}
+    weight: 25
+  - type: relative_strength_above
+    params: {period: 126, threshold: 0}
+    weight: 15
+  - type: volatility_below
+    params: {period: 60, max_pct: 35.0}
+    weight: 15
+  - type: distance_to_high_below
+    params: {period: 252, max_pct: 20.0}
+    weight: 15
+
+scoring:
+  min_score: 60
+
+risk:
+  stop_atr_factor: 4.0
+  target_atr_factor: 8.0
+  atr_period: 14
+  max_holding_days: 252

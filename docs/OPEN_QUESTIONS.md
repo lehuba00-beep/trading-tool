@@ -16,7 +16,7 @@ Vorschlag – wo nichts entschieden wird, wird der Vorschlag umgesetzt.
 Die ursprüngliche Fragestellung zu diesen Punkten bleibt unten als Begründung
 stehen.
 
-## A'. Ursprüngliche Fragestellung
+### Zu A (ursprüngliche Fragestellung)
 
 **A1 – Oberfläche.** Lokale Web-UI (FastAPI + HTMX, Browser auf `127.0.0.1`)
 oder native Desktop-GUI (PySide6)?
@@ -46,7 +46,58 @@ und Short-KOs relevant, verdoppeln aber Regelwerk und Tests.
 → *Vorschlag: Regelwerk richtungsfähig anlegen, v1 Long-Profile ausliefern,
 Short-Profile in M4 ergänzen.*
 
-## B. Fachliche Klärung während M0–M2
+## B. Entschieden (2026-09-15)
+
+| Punkt | Entscheidung | Umsetzung |
+|---|---|---|
+| B2 Währung | **Alles in EUR** | Rohkurse werden in Originalwährung gecacht und beim Lesen über tagesgenaue FX-Kurse nach EUR umgerechnet. Indikatoren laufen auf der EUR-Reihe – der Nutzer sieht damit genau die Kursentwicklung, die bei TR im Depot ankommt |
+| B3 Horizonte | **bestätigt** | Kurzfristig 1–5 Tage (zwei Profile: Pullback und Ausbruch) *und* 1–4 Wochen (Swing) als drittes Profil; mittelfristig 1–6 Monate; langfristig ab 6 Monaten. Zeiträume je Profil in der YAML änderbar |
+| B5 Aktualisierung | **3× täglich** | Standard 09:30, 14:00, 22:30 (Ortszeit), in den Einstellungen änderbar – Begründung s. unten |
+| B6 Benachrichtigungen | **nur in der App** | Neue Treffer werden in der Oberfläche markiert; keine Desktop-Popups, keine E-Mail |
+| B7 Positionsgrößenrechner | **nein** | Kein Depotvolumen, keine Stückzahlberechnung. ATR-Stop und Zielzone bleiben als reine Kursabstände erhalten – die Knock-Out-Mathematik braucht sie |
+| B8 Trefferquoten-Auswertung | **in v1** | Rückt aus M6 in den Kern. Hat Folgen für das Regelwerk, s. unten |
+
+### Zu B5: Warum 09:30 / 14:00 / 22:30
+
+Die Zeiten sind nicht gleichmäßig verteilt, sondern an den Handelszeiten
+ausgerichtet:
+
+* **09:30** – kurz nach Xetra-Eröffnung. Die US-Tagesbalken des Vortags sind
+  final, die europäischen Eröffnungskurse liegen vor.
+* **14:00** – vor US-Handelsbeginn, Zwischenstand des europäischen Tages.
+* **22:30** – nach US-Schluss. Erst hier sind *alle* Tagesbalken endgültig;
+  dieser Lauf ist der, auf dem die Signale des Tages beruhen.
+
+Zwischenstände werden in der Oberfläche als vorläufig gekennzeichnet. Ein
+Signal, das auf einem unfertigen Tagesbalken beruht, kann sich bis
+Handelsschluss wieder auflösen – das muss sichtbar sein, sonst ist es
+irreführend.
+
+### Zu B8: Folge für das Regelwerk
+
+Damit die Trefferquote ohne zweite Implementierung auswertbar ist, liefert
+jede Regel **keinen einzelnen Wahrheitswert, sondern eine boolesche Zeitreihe**
+über die gesamte Kurshistorie. Das aktuelle Screening liest davon den letzten
+Wert; die Auswertung nutzt die ganze Reihe. Ohne diesen Zuschnitt gäbe es zwei
+getrennte Regelauswertungen, die zwangsläufig auseinanderlaufen.
+
+## C. Entschieden (2026-09-15)
+
+| Punkt | Entscheidung |
+|---|---|
+| C1 Python | **Nicht auf dem Zielrechner installiert** → es muss eine eigenständige `.exe` geben. Konsequenz s. ARCHITECTURE.md §7 |
+| C3 Sprache | Deutsch |
+
+## D. Weiterhin offen (nicht blockierend)
+
+**D1 – Eigene Watchlist oder TR-Export** als Ausgangsbasis für das Universum?
+Bis dahin: Seed aus Indexkonstituenten mit Status `assumed`.
+
+**D2 – Fundamentaldaten langfristig.** Vorerst rein trend-/momentumbasiert.
+
+**D3 – Lizenz und Sichtbarkeit des Repositories.**
+
+## E. Ursprüngliche Fragestellung (Begründungen)
 
 **B1 – Trade-Republic-Liste.** Gibt es einen eigenen Export oder eine
 Watchlist als Ausgangsbasis? Sonst Seed aus Indexkonstituenten + TR-ETF-Liste
@@ -79,7 +130,7 @@ es setzt die Eingabe des Depotvolumens voraus – rein lokal gespeichert.
 **B8 – Signalgüte-Auswertung.** Trefferquote historischer Signale schon in v1
 (erhöht das Vertrauen in die Regeln erheblich) oder erst später?
 
-## C. Technische Rahmenbedingungen
+### Technische Rahmenbedingungen (ursprünglich)
 
 **C1 – Ist Python auf dem Zielrechner installiert**, oder muss es zwingend eine
 eigenständige `.exe` sein? Beides ist vorgesehen; die Reihenfolge ändert sich

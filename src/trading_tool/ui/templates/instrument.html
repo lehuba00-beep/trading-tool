@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ instrument.name }}{% endblock %}
+{% block content %}
+<h1>{{ instrument.name }}</h1>
+<p class="muted">
+  {{ instrument.isin }} &middot; {{ instrument.ticker_yahoo }} &middot;
+  {{ instrument.exchange }} &middot; Notierung in {{ instrument.currency }}
+  {% if instrument.currency != 'EUR' %}<span class="tag">nach EUR umgerechnet</span>{% endif %}
+  &middot; <span class="tag st-{{ instrument.tr_status.value }}">{{ instrument.tr_status.label }}</span>
+</p>
+
+<div class="toolbar">
+  {% if watched %}
+  <form method="post" action="/watchlist/remove">
+    <input type="hidden" name="isin" value="{{ instrument.isin }}">
+    <input type="hidden" name="zurueck" value="/instrument/{{ instrument.isin }}?strategie={{ strategie }}">
+    <button class="secondary" type="submit">Von Watchlist entfernen</button>
+  </form>
+  {% else %}
+  <form method="post" action="/watchlist/add">
+    <input type="hidden" name="isin" value="{{ instrument.isin }}">
+    <input type="hidden" name="zurueck" value="/instrument/{{ instrument.isin }}?strategie={{ strategie }}">
+    <button type="submit">Auf die Watchlist</button>
+  </form>
+  {% endif %}
+  <form method="post" action="/universe/{{ instrument.isin }}/status">
+    <input type="hidden" name="status" value="verified">
+    <input type="hidden" name="zurueck" value="/instrument/{{ instrument.isin }}?strategie={{ strategie }}">
+    <button class="secondary" type="submit">Bei TR geprueft</button>
+  </form>
+  <form method="post" action="/universe/{{ instrument.isin }}/status">
+    <input type="hidden" name="status" value="unavailable">
+    <input type="hidden" name="zurueck" value="/instrument/{{ instrument.isin }}?strategie={{ strategie }}">
+    <button class="secondary" type="submit">Nicht handelbar</button>
+  </form>
+</div>
+
+<div class="banner">
+  <strong>Handelbarkeit pruefen:</strong> {{ tr_hint.hinweis }}
+  <code class="copy">{{ tr_hint.isin }}</code>
+</div>
+
+{{ chart|safe }}
+<p class="muted small">{{ frame_len }} Tagesbalken im Cache. Kurse in EUR.</p>
+
+<div class="split">
+  <section class="card">
+    <h2>Kennzahlen</h2>
+    <table class="kv">
+      {% for key, value in metrics.items() %}
+      <tr><th>{{ key }}</th><td class="num">{{ value|zahl }}</td></tr>
+      {% endfor %}
+    </table>
+  </section>
+
+  {% if strategy %}
+  <section class="card">
+    <h2>Regelauswertung &ndash; {{ strategy.label }}</h2>
+    <ul class="rulelist">
+      {% for h in hits %}
+      <li class="{{ 'hit' if h.triggered else 'miss' }}">
+        <span class="mark">{{ '+' if h.triggered else '&ndash;'|safe }}</span>
+        {{ h.label }}
+        {% if h.required %}<span class="tag req">Pflicht</span>
+        {% else %}<span class="muted small">{{ h.weight|zahl(0) }} Punkte</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="muted small">
+      Der Score ist die Summe der erfuellten Punktregeln, auf 0&ndash;100 normiert.
+      Ein nicht erfuellter Pflichtfilter schliesst den Titel aus, statt nur Punkte
+      zu kosten.
+    </p>
+  </section>
+  {% endif %}
+</div>
+
+{% if hint %}
+<section class="card wide">
+  <h2>Hebelprodukte &ndash; rechnerische Eckwerte</h2>
+  <p class="lead">{{ hint.as_text() }}</p>
+  <table class="kv">
+    <tr><th>Stop-Abstand (aus ATR)</th><td class="num">{{ hint.stop_distance_pct|zahl(1) }} %</td></tr>
+    <tr><th>Mindestabstand der Knock-Out-Schwelle</th>
+        <td class="num">{{ hint.min_barrier_distance_pct|zahl(1) }} %
+        <span class="muted small">(Puffer {{ hint.buffer_factor|zahl(1) }}&times; Stop)</span></td></tr>
+    <tr><th>Schwelle bei</th><td class="num">{{ hint.suggested_barrier|zahl }} EUR</td></tr>
+    <tr><th>Maximal sinnvoller Hebel</th><td class="num">ca. {{ hint.max_leverage|zahl(0) }}</td></tr>
+    <tr><th>Verlust der Position bei Stop-Ausloesung</th>
+        <td class="num">ca. {{ hint.loss_at_stop_pct|zahl(0) }} %</td></tr>
+  </table>
+  <p class="muted small">
+    Der Hebel eines Knock-Out-Produkts ist naeherungsweise der Kehrwert des
+    Schwellenabstands. Hebel 20 heisst: 5 % Rueckgang im Basiswert loesen den
+    Totalverlust aus. Die Schwelle sollte deshalb deutlich hinter dem Stop liegen.
+  </p>
+
+  {% if products %}
+  <h3>Passende Produkttypen</h3>
+  <ul class="notes">
+    {% for p in products %}
+    <li><strong>{{ p.label }}</strong> <span class="muted">({{ p.eignung }})</span><br>{{ p.hinweis }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">Fuer diesen Horizont sind Hebelprodukte nicht das passende Vehikel.</p>
+  {% endif %}
+
+  <h3>Produktfinder der Emittenten</h3>
+  <ul class="chips">
+    {% for i in issuers %}<li><a href="{{ i.url }}" target="_blank" rel="noopener">{{ i.name }}</a></li>{% endfor %}
+  </ul>
+  <p class="muted small">
+    Verlinkt ist jeweils der Produktfinder, nicht ein einzelnes Produkt: Eine
+    dokumentierte oeffentliche Abfrage einzelner Zertifikate bieten die
+    Emittenten nicht an. Dieses Werkzeug ruft keine Zertifikatskurse ab.
+  </p>
+
+  <ul class="notes warn">
+    {% for r in risks %}<li>{{ r }}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

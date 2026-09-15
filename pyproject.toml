@@ -1,0 +1,46 @@
+[project]
+name = "trading-tool"
+version = "0.1.0"
+description = "Lokales Analyse- und Screening-Werkzeug fuer kurz-, mittel- und langfristige Handelschancen"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+    "pydantic>=2.6",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "apscheduler>=3.10",
+    "yfinance>=0.2.40",
+    "requests>=2.31",
+    # Windows bringt keine System-Zeitzonendatenbank mit. Ohne tzdata scheitert
+    # zoneinfo("Europe/Berlin") und damit die gesamte Zeitsteuerung.
+    "tzdata; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+xlsx = ["openpyxl>=3.1"]
+dev = ["pytest>=8.0", "ruff>=0.4", "pyinstaller>=6.6"]
+
+[project.scripts]
+trading-tool = "trading_tool.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

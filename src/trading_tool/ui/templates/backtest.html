@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Trefferquote {{ strategy.label }}{% endblock %}
+{% block content %}
+<h1>Trefferquote &ndash; {{ strategy.label }}</h1>
+<p class="muted">
+  Was ist historisch nach einem Signal dieses Profils passiert &ndash; und war das
+  besser als ein beliebiger Tag im selben Zeitraum? Die Vergleichsgruppe ist der
+  entscheidende Teil: Eine Trefferquote von 60 % ist wertlos, wenn ein
+  zufaelliger Einstieg im selben Zeitraum auf 58 % kommt.
+</p>
+
+<div class="toolbar">
+  <form method="post" action="/trefferquote/{{ name }}/run">
+    <button type="submit">Auswertung starten</button>
+  </form>
+  <span class="muted">Nutzt die bereits geladene Historie, ruft keine neuen Kurse ab.</span>
+</div>
+
+{% if result %}
+<p class="muted">
+  Stand {{ result.computed_at }} &middot; {{ result.titel_ausgewertet }} Titel,
+  davon {{ result.titel_mit_signal }} mit Signal &middot;
+  Zeitraum {{ result.zeitraum_von }} bis {{ result.zeitraum_bis }} &middot;
+  Haltedauer {{ result.haltedauer_tage }} Handelstage
+</p>
+
+{% if not result.belastbar %}
+<div class="banner warn">
+  Nur {{ result.signal.n }} Signale im Zeitraum. Unter 20 Beobachtungen ist jede
+  Quote Zufall &ndash; die Zahlen unten sind nicht belastbar.
+</div>
+{% endif %}
+
+<div class="split">
+  <section class="card">
+    <h2>Nach Signal</h2>
+    <table class="kv">
+      <tr><th>Beobachtungen</th><td class="num">{{ result.signal.n }}</td></tr>
+      <tr><th>Trefferquote</th><td class="num big">{{ result.signal.trefferquote|zahl(1) }} %</td></tr>
+      <tr><th>Median</th><td class="num">{{ result.signal.median|zahl(2) }} %</td></tr>
+      <tr><th>Mittelwert</th><td class="num">{{ result.signal.mittel|zahl(2) }} %</td></tr>
+      <tr><th>Unteres Quartil</th><td class="num">{{ result.signal.q25|zahl(2) }} %</td></tr>
+      <tr><th>Oberes Quartil</th><td class="num">{{ result.signal.q75|zahl(2) }} %</td></tr>
+      <tr><th>Schlechtester Fall</th><td class="num neg">{{ result.signal.schlechtestes|zahl(2) }} %</td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Vergleichsgruppe (alle Tage)</h2>
+    <table class="kv">
+      <tr><th>Beobachtungen</th><td class="num">{{ result.vergleich.n }}</td></tr>
+      <tr><th>Trefferquote</th><td class="num big">{{ result.vergleich.trefferquote|zahl(1) }} %</td></tr>
+      <tr><th>Median</th><td class="num">{{ result.vergleich.median|zahl(2) }} %</td></tr>
+      <tr><th>Mittelwert</th><td class="num">{{ result.vergleich.mittel|zahl(2) }} %</td></tr>
+    </table>
+    <p class="stat">
+      Vorsprung:
+      <strong class="{{ 'pos' if (result.vorsprung_trefferquote_pp or 0) > 0 else 'neg' }}">
+        {{ result.vorsprung_trefferquote_pp|zahl(1) }} Prozentpunkte</strong>
+      Trefferquote,
+      <strong class="{{ 'pos' if (result.vorsprung_median_pp or 0) > 0 else 'neg' }}">
+        {{ result.vorsprung_median_pp|zahl(2) }} Prozentpunkte</strong> Median.
+    </p>
+  </section>
+</div>
+
+{% if result.je_titel %}
+<section class="card wide">
+  <h2>Nach Titel</h2>
+  <table class="grid">
+    <thead><tr><th>Titel</th><th>Signale</th><th>Trefferquote</th><th>Median</th></tr></thead>
+    <tbody>
+    {% for row in result.je_titel %}
+      <tr><td><a href="/instrument/{{ row.isin }}">{{ row.name }}</a></td>
+        <td class="num">{{ row.n }}</td>
+        <td class="num">{{ row.trefferquote|zahl(1) }} %</td>
+        <td class="num {{ 'pos' if row.median > 0 else 'neg' }}">{{ row.median|zahl(2) }} %</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<section class="card wide">
+  <h2>Wie diese Zahlen zu lesen sind</h2>
+  <ul class="notes warn">
+    {% for note in result.hinweise %}<li>{{ note }}</li>{% endfor %}
+  </ul>
+</section>
+{% else %}
+<p class="muted">Noch keine Auswertung. Sie braucht geladene Kurshistorie &ndash;
+am besten zuerst ein Screening laufen lassen.</p>
+{% endif %}
+{% endblock %}

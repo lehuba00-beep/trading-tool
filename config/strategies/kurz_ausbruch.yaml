@@ -1,0 +1,54 @@
+# Kurzfristig, 1-5 Handelstage: Ausbruch auf neue Hochs mit Volumen.
+name: kurz_ausbruch
+label: "Kurzfristig - Ausbruch"
+horizon: kurzfristig
+direction: long
+description: >
+  Sucht Titel, die ueber das Hoch der letzten 20 Tage ausbrechen und dabei
+  ueberdurchschnittliches Volumen zeigen. Typische Haltedauer 1-5 Handelstage.
+
+universe_filter:
+  asset_class: [stock, etf]
+  tr_status: [verified, assumed]
+  min_avg_turnover_eur: 1000000
+  min_history_days: 250
+
+rules:
+  - type: above_ma
+    params: {ma: ema, period: 50}
+    required: true
+  - type: atr_pct_between
+    params: {period: 14, low: 1.0, high: 8.0}
+    required: true
+
+  - type: donchian_breakout
+    params: {period: 20}
+    weight: 30
+  # Ein Ausbruch ohne Volumen ist meist keiner - deshalb das zweithoechste
+  # Gewicht im Profil.
+  - type: relative_volume_above
+    params: {lookback: 20, factor: 1.5}
+    weight: 25
+  - type: distance_to_high_below
+    params: {period: 252, max_pct: 5.0}
+    weight: 15
+  - type: macd_above_signal
+    params: {fast: 12, slow: 26, signal: 9}
+    weight: 10
+  # Vorausgegangene Volatilitaetskontraktion - sagt die Ausdehnung voraus,
+  # nicht deren Richtung. Nur zusammen mit der Ausbruchsregel sinnvoll.
+  - type: bollinger_squeeze
+    params: {period: 20, lookback: 126, max_percentile: 35}
+    weight: 10
+  - type: roc_above
+    params: {period: 10, threshold: 0}
+    weight: 10
+
+scoring:
+  min_score: 60
+
+risk:
+  stop_atr_factor: 2.0
+  target_atr_factor: 3.0
+  atr_period: 14
+  max_holding_days: 5
