@@ -22,7 +22,14 @@ dependencies = [
 
 [project.optional-dependencies]
 xlsx = ["openpyxl>=3.1"]
-dev = ["pytest>=8.0", "ruff>=0.4", "pyinstaller>=6.6"]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "pyinstaller>=6.6",
+    # Der Testclient von Starlette braucht einen HTTP-Client; ohne ihn
+    # scheitert schon das Einsammeln der Oberflaechentests.
+    "httpx2>=0.1",
+]
 
 [project.scripts]
 trading-tool = "trading_tool.__main__:main"
