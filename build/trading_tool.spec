@@ -37,10 +37,13 @@ hiddenimports = [
     # Zeitzonendatenbank - Windows hat keine eigene.
     "tzdata",
     "zoneinfo",
-] + collect_submodules("apscheduler")
+] + collect_submodules("apscheduler") + collect_submodules("trading_tool")
 
 a = Analysis(
-    [str(SRC / "__main__.py")],
+    # Nicht direkt auf trading_tool/__main__.py zeigen: PyInstaller fuehrt das
+    # Einstiegsskript als __main__ aus, wodurch dort jeder relative Import
+    # scheitert. entry.py importiert das Paket stattdessen absolut.
+    [str(ROOT / "build" / "entry.py")],
     pathex=[str(ROOT / "src")],
     binaries=[],
     datas=datas,

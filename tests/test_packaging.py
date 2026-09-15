@@ -8,7 +8,10 @@ eine im Entwicklungsrechner von Hand nachinstallierte Abhaengigkeit nicht in
 from __future__ import annotations
 
 import ast
+import os
+import subprocess
 import sys
+import tempfile
 import tomllib
 from importlib.metadata import packages_distributions
 from pathlib import Path
@@ -88,11 +91,47 @@ def test_testclient_ist_benutzbar():
         "src/trading_tool/ui/static/poll.js",
         "src/trading_tool/ui/templates/base.html",
         "build/trading_tool.spec",
+        "build/entry.py",
     ],
 )
 def test_mitgelieferte_datei_existiert(relativer_pfad):
     """Diese Dateien werden in die Exe gepackt - fehlt eine, startet sie nicht."""
     assert (ROOT / relativer_pfad).exists(), relativer_pfad
+
+
+def test_startskript_laeuft_als_eigenstaendiges_skript():
+    """Stellt die Startbedingung von PyInstaller nach.
+
+    PyInstaller fuehrt sein Einstiegsskript als ``__main__`` aus, nicht als
+    Modul eines Pakets - relative Importe scheitern dort. Genau daran ist die
+    erste gebaute Exe gestorben, obwohl der Build selbst fehlerfrei durchlief.
+    Dieser Test faengt das ohne Windows und ohne PyInstaller ab.
+    """
+    ergebnis = subprocess.run(
+        [sys.executable, str(ROOT / "build" / "entry.py"), "rules"],
+        capture_output=True, text=True, timeout=120,
+        cwd=ROOT, env={**os.environ, "TRADING_TOOL_DATA_DIR": tempfile.mkdtemp()},
+    )
+    assert ergebnis.returncode == 0, ergebnis.stderr[-2000:]
+    assert "Regelbausteine" in ergebnis.stdout
+
+
+def test_paketmodul_direkt_aufgerufen_scheitert_wie_erwartet():
+    """Die Gegenprobe: Warum es das Startskript ueberhaupt braucht."""
+    ergebnis = subprocess.run(
+        [sys.executable, str(ROOT / "src" / "trading_tool" / "__main__.py"), "rules"],
+        capture_output=True, text=True, timeout=120, cwd=ROOT,
+    )
+    assert ergebnis.returncode != 0
+    assert "relative import" in ergebnis.stderr
+
+
+def test_spec_zeigt_auf_das_startskript():
+    spec = (ROOT / "build" / "trading_tool.spec").read_text(encoding="utf-8")
+    assert "entry.py" in spec
+    assert 'SRC / "__main__.py"' not in spec, (
+        "Das Einstiegsskript darf nicht direkt auf das Paketmodul zeigen"
+    )
 
 
 def test_spec_packt_alle_laufzeitdateien_ein():
