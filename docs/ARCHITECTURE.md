@@ -296,15 +296,50 @@ Signale; die Bewertung und jede Entscheidung liegen beim Nutzer.
 | Windows-Build | lokal mit PyInstaller | GitHub-Actions-Windows-Runner | PyInstaller kann nicht plattformübergreifend bauen, und auf dem Zielrechner ist kein Python installiert |
 | Abhängigkeiten | – | `tzdata` ergänzt | Windows bringt keine System-Zeitzonendatenbank mit; ohne sie scheitert `zoneinfo("Europe/Berlin")` und damit die gesamte Zeitsteuerung |
 
-## 11. Was nicht geprüft werden konnte
+## 11. Was geprüft ist – und was nicht
 
-Die Entwicklungsumgebung hatte **keinen Netzzugriff auf Yahoo und Stooq**
-(der Proxy blockt beide). Geprüft ist daher alles, was ohne Netz prüfbar ist:
-Normalisierung der Provider-Antworten, Wiederholungs- und Rückfalllogik,
-Cache, Umrechnung, Indikatoren, Regeln, Screening, Auswertung und Oberfläche –
-gegen synthetische Kursreihen und feste Testdaten.
+**Geprüft ohne Netz** (131 Tests, reproduzierbar, jeder echte Kursabruf ist im
+Testlauf gesperrt und schlägt laut fehl): Normalisierung der
+Provider-Antworten, Wiederholungs- und Rückfalllogik, Cache, EUR-Umrechnung,
+Indikatoren gegen von Hand nachrechenbare Fälle, Regelwerk, Scoring, Screening,
+Trefferquoten-Auswertung, Derivate-Mathematik, Oberfläche.
 
-**Nicht ausgeführt wurde ein echter Abruf gegen Yahoo oder Stooq.** Der erste
-scharfe Abruf findet auf dem Zielrechner statt. Falls dort etwas klemmt, steht
-die Ursache im Protokoll (`trading-tool.log`); `trading-tool screen -s swing -v`
-zeigt sie direkt in der Konsole.
+**Geprüft auf Windows** (GitHub-Actions-Runner, bei jedem Push): Linter, alle
+Tests, Prüfung der Universumsliste, PyInstaller-Bau – und danach ein echter
+Start der gebauten Exe. Sowohl die Kommandozeile als auch die Oberfläche: Der
+Server wird gestartet, es wird auf seine Antwort gewartet, und Trefferliste,
+Universum, Einstellungen, Stylesheet und Skript werden einzeln abgerufen. Bei
+PyInstaller fehlen genau solche mitgelieferten Dateien gern im Bundle, und ein
+Build, der nur fehlerfrei durchläuft, sagt darüber nichts.
+
+**Nicht geprüft: ein echter Kursabruf.** Die Entwicklungsumgebung hatte keinen
+Netzzugriff auf Yahoo und Stooq (der Proxy blockt beide), und die Tests sind
+bewusst so gebaut, dass sie ohne Netz auskommen. Der erste scharfe Abruf findet
+auf dem Zielrechner statt. Falls dort etwas klemmt, steht die Ursache im
+Protokoll (`trading-tool.log`); `TradingTool.exe screen -s swing -v` zeigt sie
+direkt in der Konsole.
+
+Das ist keine Nachlässigkeit, sondern eine Abwägung: Tests, die gegen eine
+fremde Live-Schnittstelle laufen, schlagen irgendwann aus Gründen fehl, die
+nichts mit dem Code zu tun haben. Der Preis dafür ist, dass die Schnittstelle
+selbst erst im Betrieb geprüft wird.
+
+### Was die Windows-Builds tatsächlich gefunden haben
+
+Vier Anläufe bis zum grünen Build – jeder Fehlschlag war echt und keiner davon
+hier reproduzierbar gewesen, bevor der Runner ihn gezeigt hat:
+
+1. **Nicht deklarierte Abhängigkeit.** Der Testclient von Starlette lädt seinen
+   HTTP-Client zur Laufzeit nach; lokal war er von Hand installiert, in
+   `pyproject.toml` stand er nicht. → `tests/test_packaging.py` prüft jetzt jeden
+   Fremdimport gegen die Deklaration.
+2. **Nicht beendeter Arbeitsthread.** `JobRunner` startete je Anwendungsinstanz
+   einen Thread, den `close()` nie beendet hat. In der Anwendung gibt es nur
+   eine Instanz – im Testlauf sammelten sich Dutzende an und der Abbau hing.
+3. **Ein Test mit echtem Netzabruf.** Ohne Netz scheiterte er sofort und lief
+   grün durch; mit Netz begann er, hunderte Titel zu laden. → Netzsperre im
+   Testlauf.
+4. **Startskript.** PyInstaller führt sein Einstiegsskript als `__main__` aus,
+   nicht als Modul eines Pakets – jeder relative Import scheiterte. Die Exe war
+   fertig gebaut und startete nicht. → `build/entry.py`, plus ein Test, der
+   diese Startbedingung ohne PyInstaller nachstellt.

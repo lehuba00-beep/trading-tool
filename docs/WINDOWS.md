@@ -7,6 +7,10 @@ eigenstaendige `.exe` gebaut. **PyInstaller kann nicht plattformuebergreifend
 bauen**: Eine Windows-Exe entsteht nur auf einem Windows-System. Der Bau laeuft
 deshalb in GitHub Actions auf einem Windows-Runner.
 
+Jeder Lauf prueft vorher, dass die gebaute Exe tatsaechlich startet - die
+Kommandozeile und die Oberflaeche einzeln. Ein Artefakt, das dort liegt, ist
+also nicht nur gebaut, sondern nachweislich lauffaehig.
+
 1. Im Repository auf **Actions** gehen.
 2. Den letzten erfolgreichen Lauf von **Windows-Build** oeffnen.
 3. Unten unter **Artifacts** `TradingTool-windows` herunterladen.
