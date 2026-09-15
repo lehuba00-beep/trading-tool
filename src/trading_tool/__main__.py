@@ -82,18 +82,24 @@ def command_screen(args: argparse.Namespace) -> int:
     state = _build_state()
     names = [args.strategy] if args.strategy else list(state.active_strategies())
 
+    # Zeilenweises Ueberschreiben nur im Terminal - in eine Datei oder Pipe
+    # umgeleitet erzeugt das sonst eine einzige unlesbare Zeile.
+    interaktiv = sys.stdout.isatty()
+
+    def progress(current: int, total: int, message: str) -> None:
+        if interaktiv:
+            print(f"\r  [{current:>4}/{total}] {message[:58]:<58}", end="", flush=True)
+
     for name in names:
         if name not in state.strategies:
             print(f"Unbekannte Strategie '{name}'. "
                   f"Verfuegbar: {', '.join(state.strategies)}")
             return 2
 
-        def progress(current: int, total: int, message: str) -> None:
-            print(f"\r  [{current:>4}/{total}] {message[:58]:<58}", end="", flush=True)
-
         print(f"\n{state.strategies[name].label}")
         _, signals = state.screener.run(name, args.watchlist, not args.no_refresh, progress)
-        print("\r" + " " * 72 + "\r", end="")
+        if interaktiv:
+            print("\r" + " " * 72 + "\r", end="")
 
         if not signals:
             print("  keine Treffer")

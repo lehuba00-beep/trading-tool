@@ -137,7 +137,8 @@ def instrument_detail(request: Request, isin: str, strategie: str = ""):
             "ADX(14)": _fmt(ctx.adx(14).iloc[-1]),
             "ATR(14) in %": _fmt(ctx.atr_pct(14).iloc[-1]),
             "Rel. Volumen": _fmt(ctx.relative_volume(20).iloc[-1]),
-            "Umsatz 20 Tage (EUR)": _fmt(ctx.turnover(20).iloc[-1], 0),
+            # Kompakt: 268 Mio. statt 268.475.928,00
+            "Umsatz 20 Tage (EUR)": _compact(ctx.turnover(20).iloc[-1]),
             "Abstand 52W-Hoch in %": _fmt(ctx.distance_to_high(252).iloc[-1]),
             "Performance 20 Tage in %": _fmt(ctx.roc(20).iloc[-1]),
             "Performance 126 Tage in %": _fmt(ctx.roc(126).iloc[-1]),
@@ -274,6 +275,12 @@ def settings_view(request: Request):
         providers=[p.name for p in state.chain.providers],
         history=state.jobs.history,
     )
+
+
+def _compact(value) -> str:
+    from .app import _money
+
+    return _money(_fmt(value, 0))
 
 
 def _fmt(value, digits: int = 2):

@@ -1,27 +1,104 @@
-# Trading-Tool – Analyse- und Screening-Werkzeug (Konzeptphase)
+# Trading-Tool
 
-Lokal unter Windows lauffähiges Tool zur Identifikation kurz-, mittel- und
-langfristiger Handelschancen in Aktien, ETFs und (später) Derivaten, beschränkt
-auf bei Trade Republic handelbare Wertpapiere.
+Lokal unter Windows lauffähiges Analyse- und Screening-Werkzeug für kurz-,
+mittel- und langfristige Handelschancen in Aktien und ETFs, beschränkt auf bei
+Trade Republic handelbare Wertpapiere, mit rechnerischer Umsetzungshilfe für
+Hebelprodukte.
 
-**Status: Konzept.** In diesem Stand existiert noch kein Code – nur die
-Architektur- und Entscheidungsdokumente.
+**Keine Broker-Anbindung. Keine Orderausführung. Keine Anlageberatung.**
 
-## Dokumente
+## Was es tut
+
+* Durchsucht rund 215 Titel nach fünf Regelprofilen und zeigt Treffer mit Score,
+  ausgelösten Einzelregeln und Kennzahlen.
+* Rechnet alle Kurse nach EUR um – also die Entwicklung, die im Depot ankommt.
+* Wertet auf Knopfdruck aus, was historisch nach einem Signal passiert ist, und
+  stellt das einer Vergleichsgruppe gegenüber.
+* Leitet für Hebelprodukte den maximal sinnvollen Hebel und den
+  Mindestabstand der Knock-Out-Schwelle aus der Volatilität ab – ohne einen
+  einzigen Zertifikatskurs abzurufen.
+* Läuft dreimal täglich automatisch: 09:30, 14:00, 22:30.
+
+## Schnellstart
+
+**Ohne Python-Installation** (der vorgesehene Weg): Die fertige Anwendung aus
+dem GitHub-Actions-Artefakt herunterladen – Anleitung in
+[docs/WINDOWS.md](docs/WINDOWS.md). Entpacken, `TradingTool.exe` starten, der
+Browser öffnet sich.
+
+**Mit Python 3.11 oder neuer:**
+
+```bash
+pip install -e .
+trading-tool            # Oberfläche starten
+```
+
+Unter Windows genügt ein Doppelklick auf `start_windows.bat`.
+
+Beim ersten Screening werden rund vier Jahre Tagesbalken geladen – das dauert
+einige Minuten. Danach nur noch die fehlenden Tage.
+
+## Ohne Oberfläche
+
+```bash
+trading-tool universe            # Universumsliste prüfen
+trading-tool rules               # Regelbausteine auflisten
+trading-tool screen -s swing     # Screening, optional --export
+trading-tool backtest -s swing   # Trefferquote historischer Signale
+```
+
+## Die fünf Profile
+
+| Profil | Horizont | Ansatz |
+|---|---|---|
+| `kurz_pullback` | 1–5 Tage | Rücksetzer im intakten Aufwärtstrend (RSI(2) unter SMA-200-Filter) |
+| `kurz_ausbruch` | 1–5 Tage | Ausbruch über das 20-Tage-Hoch mit Volumenbestätigung |
+| `swing` | 1–4 Wochen | Bestätigter Trend mit frischem Momentumwechsel |
+| `mittelfristig` | 1–6 Monate | Trendstruktur 50/200 plus relative Stärke |
+| `langfristig` | ab 6 Monaten | 12-1-Momentum unter 200-Tage-Regimefilter |
+
+Rücksetzer und Ausbruch sind bewusst getrennt: In einem gemeinsamen Score
+würden sich die gegensätzlichen Ansätze teilweise neutralisieren.
+
+Jedes Profil ist eine YAML-Datei in `config/strategies/` und lässt sich ohne
+Neubau anpassen. Eigene Profile im Datenverzeichnis haben Vorrang.
+
+## Dokumentation
 
 | Datei | Inhalt |
 |---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Tech-Stack, Schichtenmodell, Ordnerstruktur, Datenmodell, Ausbaustufen |
-| [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) | Kursdatenquellen im Vergleich, Pflege der Trade-Republic-Liste, Derivate-Daten |
-| [docs/SIGNALS.md](docs/SIGNALS.md) | Indikator- und Regelkatalog je Zeithorizont, Scoring, Derivate-Mathematik |
-| [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md) | Offene Punkte, die vor bzw. während der Implementierung zu entscheiden sind |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Schichtenmodell, Tech-Stack, Ordnerstruktur, Datenmodell, Umsetzungsstand |
+| [docs/SIGNALS.md](docs/SIGNALS.md) | Indikator- und Regelkatalog je Zeithorizont, Scoring, Knock-Out-Mathematik |
+| [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) | Kursquellen im Vergleich, Grenzen, Derivate-Datenlage |
+| [docs/WINDOWS.md](docs/WINDOWS.md) | Installation, Ablageorte, Betrieb, Fehlersuche |
+| [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md) | Getroffene Entscheidungen und verbleibende offene Punkte |
+| [universe/README.md](universe/README.md) | Pflege der Trade-Republic-Liste |
 
-## Abgrenzung
+## Entwicklung
 
-* Keine Verbindung zu Trade Republic oder einem anderen Broker.
-* Keine Orderausführung, kein Kontozugriff, kein Portfoliotracking (v1).
-* **Keine Anlageberatung.** Das Tool zeigt Kennzahlen und regelbasierte Signale
-  an. Es spricht keine Empfehlung im Sinne von § 2 Abs. 8 Nr. 10 WpHG aus und
-  berücksichtigt keine persönlichen Verhältnisse. Jede Handelsentscheidung
-  trifft ausschließlich der Nutzer. Historische Signale sagen nichts über
-  künftige Kursentwicklungen aus.
+```bash
+pip install -e ".[dev,xlsx]"
+pytest -q          # 110 Tests, ohne Netzzugriff
+ruff check src tests
+```
+
+## Grenzen, die man kennen sollte
+
+* **Handelbarkeit ist nicht abfragbar.** Trade Republic bietet keine
+  Schnittstelle dafür. Die mitgelieferte Liste steht auf `assumed` – vor jeder
+  Order in der App nachsehen. Die Oberfläche macht das Nachtragen zu einem Klick.
+* **Yahoo ist eine inoffizielle Quelle.** Sie bricht gelegentlich; Stooq springt
+  als Rückfall ein. Ein Wechsel auf einen bezahlten Anbieter betrifft ein Modul.
+* **Die Trefferquoten-Auswertung schaut zurück, nicht nach vorn.** Delistete
+  Titel fehlen in der Datenquelle, Gebühren und Spread sind nicht enthalten, und
+  mit genügend Parametervarianten sieht jede Regel irgendwann gut aus.
+* **Keine Zertifikatskurse.** Für Hebelprodukte liefert das Werkzeug Mathematik
+  und Hinweise, keine Produktdaten.
+
+## Rechtlicher Hinweis
+
+Dieses Werkzeug zeigt Kennzahlen und regelbasierte Signale. Es spricht keine
+Empfehlung im Sinne einer Anlageberatung aus, berücksichtigt keine persönlichen
+Verhältnisse und hat keine Verbindung zu einem Broker. Jede Handelsentscheidung
+trifft ausschließlich der Nutzer. Historische Signale sagen nichts über
+künftige Kursentwicklungen aus. Kursdaten ohne Gewähr.

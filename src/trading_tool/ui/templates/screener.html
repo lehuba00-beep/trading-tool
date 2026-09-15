@@ -61,8 +61,11 @@
       <td class="num">{{ s.metrics.get('stop')|zahl }}</td>
       <td class="num">{{ s.metrics.get('ziel')|zahl }}</td>
       <td class="num">{{ s.metrics.get('umsatz_20d_eur')|geld }}</td>
-      <td class="rules">
-        {% for label in s.triggered_labels %}<span class="tag hit">{{ label }}</span>{% endfor %}
+      <td class="rules" title="{{ s.triggered_labels|join(' | ') }}">
+        {% for label in s.triggered_labels[:3] %}<span class="tag hit">{{ label }}</span>{% endfor %}
+        {% if s.triggered_labels|length > 3 %}
+          <span class="tag more">+{{ s.triggered_labels|length - 3 }} weitere</span>
+        {% endif %}
       </td>
       <td><span class="tag st-{{ s.tr_status.value }}">{{ s.tr_status.label }}</span></td>
       <td>

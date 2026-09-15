@@ -124,6 +124,7 @@ table.kv td { padding: 6px 0; border-bottom: 1px solid var(--border); }
 }
 .tag.hit { border-color: color-mix(in srgb, var(--pos) 45%, var(--border)); color: var(--pos); }
 .tag.req { border-color: var(--accent); color: var(--accent); }
+.tag.more { font-style: italic; }
 .tag.prov { border-color: var(--warn-border); color: #a97c17; }
 @media (prefers-color-scheme: dark) { .tag.prov { color: #d8b154; } }
 .tag.st-verified { border-color: color-mix(in srgb, var(--pos) 45%, var(--border)); color: var(--pos); }
@@ -134,7 +135,7 @@ table.kv td { padding: 6px 0; border-bottom: 1px solid var(--border); }
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--accent); font-weight: 700; text-align: center;
 }
-td.rules { max-width: 380px; }
+td.rules { max-width: 330px; }
 
 .chips { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 8px 0; }
 .chips li {

@@ -1,4 +1,7 @@
-# Architektur-Vorschlag
+# Architektur
+
+**Stand: umgesetzt.** Abschnitt 10 listet die Stellen, an denen die Umsetzung
+vom ursprünglichen Vorschlag abweicht, und warum.
 
 ## 1. Leitgedanken
 
@@ -278,3 +281,30 @@ Architektur nicht mehr.
 Keine Broker-Anbindung, keine Orderübermittlung, keine Kontodaten, kein
 Portfoliotracking in v1. Das Tool berechnet Kennzahlen und zeigt regelbasierte
 Signale; die Bewertung und jede Entscheidung liegen beim Nutzer.
+
+
+## 10. Abweichungen vom ursprünglichen Vorschlag
+
+| Punkt | Vorschlag | Umgesetzt | Grund |
+|---|---|---|---|
+| Interaktivität | HTMX einbinden | 30 Zeilen eigenes Polling-Skript | Gebraucht wird genau ein Verhalten: ein Element regelmäßig nachladen. Eine Bibliothek dafür mitzuliefern wäre unverhältnismäßig – und sie müsste mitgeliefert werden, damit die App offline läuft |
+| Charts | Lightweight-Charts oder Plotly | Serverseitig gezeichnetes SVG | Kein CDN, keine JS-Abhängigkeit, nichts für PyInstaller. Kerzen, Volumen und Overlays sind knapp 100 Zeilen |
+| Profile | drei (ein kurzfristiges) | fünf | Rücksetzer und Ausbruch sind gegensätzliche Ansätze und neutralisieren sich in einem gemeinsamen Score. Dazu Swing als eigenes Profil für 1–4 Wochen |
+| Trefferquote | M6, optional | in v1 | Auf Wunsch vorgezogen. Das hat die Regelschnittstelle geprägt: Jede Regel liefert eine **boolesche Zeitreihe** statt eines Einzelwerts, damit Screening und Auswertung dieselbe Logik nutzen |
+| Regelformat | Ausdrücke in YAML | benannte Bausteine mit Parametern | Kein `eval` aus einer Konfigurationsdatei, einzeln testbar, in der Oberfläche als Formular darstellbar |
+| Positionsgrößen | Rechner vorgesehen | entfällt | Abgewählt. ATR-Stop und Zielzone bleiben als reine Kursabstände – die Knock-Out-Mathematik braucht sie |
+| Windows-Build | lokal mit PyInstaller | GitHub-Actions-Windows-Runner | PyInstaller kann nicht plattformübergreifend bauen, und auf dem Zielrechner ist kein Python installiert |
+| Abhängigkeiten | – | `tzdata` ergänzt | Windows bringt keine System-Zeitzonendatenbank mit; ohne sie scheitert `zoneinfo("Europe/Berlin")` und damit die gesamte Zeitsteuerung |
+
+## 11. Was nicht geprüft werden konnte
+
+Die Entwicklungsumgebung hatte **keinen Netzzugriff auf Yahoo und Stooq**
+(der Proxy blockt beide). Geprüft ist daher alles, was ohne Netz prüfbar ist:
+Normalisierung der Provider-Antworten, Wiederholungs- und Rückfalllogik,
+Cache, Umrechnung, Indikatoren, Regeln, Screening, Auswertung und Oberfläche –
+gegen synthetische Kursreihen und feste Testdaten.
+
+**Nicht ausgeführt wurde ein echter Abruf gegen Yahoo oder Stooq.** Der erste
+scharfe Abruf findet auf dem Zielrechner statt. Falls dort etwas klemmt, steht
+die Ursache im Protokoll (`trading-tool.log`); `trading-tool screen -s swing -v`
+zeigt sie direkt in der Konsole.

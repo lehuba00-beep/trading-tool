@@ -345,7 +345,9 @@ class BacktestRepo:
         if not row:
             return None
         data = json.loads(row["payload"])
-        data["computed_at"] = row["computed_at"]
+        data["computed_at"] = datetime.fromisoformat(row["computed_at"]).strftime(
+            "%d.%m.%Y %H:%M"
+        )
         return data
 
 
