@@ -32,7 +32,9 @@ SECRET_FILE = "session.key"
 
 # Diese Pfade muessen ohne Anmeldung erreichbar sein, sonst laedt die
 # Anmeldeseite ihr eigenes Stylesheet nicht.
-OPEN_PATHS = ("/anmelden", "/static/", "/manifest.webmanifest", "/sw.js", "/icons/")
+# /ca.crt gehoert dazu: Ohne die Stelle kann das Handy die Verbindung gar
+# nicht erst aufbauen, also auch nicht die Anmeldeseite laden.
+OPEN_PATHS = ("/anmelden", "/static/", "/manifest.webmanifest", "/sw.js", "/icons/", "/ca.crt")
 
 
 def hash_password(plain: str) -> str:
@@ -133,6 +135,15 @@ def lan_ready(settings) -> tuple[bool, str]:
 
 def bind_host(settings) -> str:
     return "0.0.0.0" if settings.ui.allow_lan else settings.ui.host  # noqa: S104
+
+
+def tls_active(settings) -> bool:
+    """Verschluesselung nur dort, wo sie etwas bewirkt.
+
+    Auf 127.0.0.1 verlaesst kein Paket den Rechner - dort brächte TLS keinen
+    Schutz, nur eine Zertifikatswarnung im Browser.
+    """
+    return bool(settings.ui.allow_lan and settings.ui.use_tls)
 
 
 class LoginThrottle:

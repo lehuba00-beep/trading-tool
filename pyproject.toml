@@ -18,6 +18,8 @@ dependencies = [
     "apscheduler>=3.10",
     "yfinance>=0.2.40",
     "requests>=2.31",
+    # Erzeugt das Zertifikat fuer die verschluesselte Verbindung im Heimnetz
+    "cryptography>=42.0",
     # Windows bringt keine System-Zeitzonendatenbank mit. Ohne tzdata scheitert
     # zoneinfo("Europe/Berlin") und damit die gesamte Zeitsteuerung.
     "tzdata; sys_platform == 'win32'",

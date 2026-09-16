@@ -201,3 +201,42 @@ def test_abmeldeknopf_nur_bei_gesetztem_passwort(geschuetzter_client, client):
     geschuetzter_client.post("/anmelden", data={"passwort": PASSWORT})
     assert "/abmelden" in geschuetzter_client.get("/").text
     assert "/abmelden" not in client.get("/").text
+
+
+# ----------------------------------------------- Verschluesselte Verbindung
+
+def test_zertifikat_der_stelle_ist_ohne_anmeldung_abrufbar(seeded, settings, tmp_path):
+    """Ohne die Stelle kommt das Handy gar nicht erst bis zur Anmeldeseite."""
+    from trading_tool.tls import ensure_certificate
+
+    ensure_certificate(settings.data_dir)
+    settings.schedule.enabled = False
+    settings.ui.password_hash = hash_password(PASSWORT)
+    with TestClient(create_app(settings)) as client:
+        antwort = client.get("/ca.crt")
+        assert antwort.status_code == 200
+        assert antwort.headers["content-type"] == "application/x-x509-ca-cert"
+        assert antwort.content.startswith(b"-----BEGIN CERTIFICATE-----")
+
+
+def test_ohne_zertifikat_leitet_der_abruf_weiter(geschuetzter_client):
+    antwort = geschuetzter_client.get("/ca.crt", follow_redirects=False)
+    assert antwort.status_code == 303
+
+
+def test_plaetzchen_ist_ueber_http_nicht_als_sicher_markiert(geschuetzter_client):
+    """Auf HTTP waere 'Secure' kontraproduktiv - der Browser wuerde das
+    Plaetzchen dann nie senden."""
+    antwort = geschuetzter_client.post(
+        "/anmelden", data={"passwort": PASSWORT}, follow_redirects=False)
+    assert "secure" not in antwort.headers.get("set-cookie", "").lower()
+
+
+def test_plaetzchen_ist_ueber_https_als_sicher_markiert(seeded, settings):
+    settings.schedule.enabled = False
+    settings.ui.password_hash = hash_password(PASSWORT)
+    with TestClient(create_app(settings), base_url="https://testserver") as client:
+        antwort = client.post("/anmelden", data={"passwort": PASSWORT}, follow_redirects=False)
+        kopfzeile = antwort.headers.get("set-cookie", "").lower()
+        assert "secure" in kopfzeile
+        assert "httponly" in kopfzeile

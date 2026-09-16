@@ -137,6 +137,10 @@ class UISettings(BaseModel):
     ohne eines verweigert die Anwendung den Start im Netz."""
     password_hash: str = ""
     """Abgeleitetes Passwort. Klartext wird nie gespeichert."""
+    use_tls: bool = True
+    """Verschluesselte Verbindung bei Netzzugriff. Ohne sie gingen Passwort
+    und Daten im Klartext durchs WLAN. Auf 127.0.0.1 ohne Wirkung und daher
+    dort nicht aktiv."""
 
 
 class Settings(BaseModel):

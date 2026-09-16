@@ -146,6 +146,24 @@ def icon(request: Request, name: str):
     return FileResponse(pfad, media_type="image/png")
 
 
+@router.get("/ca.crt", include_in_schema=False)
+def zertifizierungsstelle(request: Request):
+    """Die eigene Zertifizierungsstelle zum Hinterlegen auf dem Handy.
+
+    Einmal installiert, gilt sie auch fuer spaeter neu ausgestellte
+    Serverzertifikate - etwa nach einem Adresswechsel aus dem Router.
+    """
+    from ..tls import paths
+
+    state = _state(request)
+    datei = paths(state.settings.data_dir).ca_cert
+    if not datei.exists():
+        return RedirectResponse("/einstellungen", status_code=303)
+    return FileResponse(
+        datei, media_type="application/x-x509-ca-cert", filename="trading-tool-ca.crt"
+    )
+
+
 # ------------------------------------------------------------------ Anmeldung
 
 @router.get("/anmelden", response_class=HTMLResponse)
@@ -182,6 +200,9 @@ async def anmelden(request: Request, passwort: str = Form(...), weiter: str = Fo
     antwort.set_cookie(
         COOKIE_NAME, issue_token(request.app.state.secret),
         max_age=SESSION_MAX_AGE, httponly=True, samesite="lax",
+        # Ueber HTTPS nur verschluesselt senden. Auf HTTP waere das Merkmal
+        # kontraproduktiv - der Browser wuerde das Plaetzchen nie schicken.
+        secure=request.url.scheme == "https",
     )
     return antwort
 

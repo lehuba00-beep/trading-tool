@@ -90,9 +90,9 @@ Anwendung.
 ## Zugriff vom Smartphone
 
 Die Oberfläche ist eine Webseite &ndash; das Handy braucht also keine eigene App,
-sondern nur den Browser. Zwei Schritte:
+sondern nur den Browser. Drei Schritte, einmalig.
 
-**1. Passwort setzen und Netzzugriff einschalten**
+### 1. Passwort setzen und Netzzugriff einschalten
 
 ```
 TradingTool.exe passwort --netz
@@ -100,30 +100,71 @@ TradingTool.exe passwort --netz
 
 Der Zugriff aus dem Netz ist **ohne Passwort gesperrt**, nicht bloß abgeraten:
 Sonst könnte jedes Gerät im WLAN die Watchlist lesen und Screenings auslösen.
-Das Passwort wird nur abgeleitet gespeichert, nie im Klartext.
+Das Passwort wird nur abgeleitet gespeichert (pbkdf2 mit zufälligem Salz), nie
+im Klartext.
 
-**2. Anwendung starten**
+### 2. Verschlüsselung einrichten
 
-Beim Start steht im Konsolenfenster zusätzlich die Adresse im Heimnetz, etwa
-`http://192.168.1.42:52341`. Die im Handy-Browser aufrufen, Passwort eingeben
-&ndash; die Anmeldung hält 30 Tage.
+```
+TradingTool.exe zertifikat
+```
 
-### Auf den Startbildschirm legen
+Legt eine eigene kleine Zertifizierungsstelle an und stellt damit ein
+Serverzertifikat aus. Danach läuft die Verbindung über HTTPS, und Passwort wie
+Daten sind auf dem Weg durchs WLAN verschlüsselt.
+
+Der Umweg über eine eigene Stelle statt eines einzelnen selbstsignierten
+Zertifikats hat einen konkreten Grund: Die Stelle wird **einmal** auf dem Handy
+hinterlegt und gilt danach dauerhaft &ndash; auch wenn der Rechner vom Router eine
+neue Adresse bekommt und das Serverzertifikat neu ausgestellt werden muss. Das
+erledigt die Anwendung beim Start von selbst.
+
+### 3. Die Stelle auf dem Handy hinterlegen
+
+Beim Start steht die Adresse im Konsolenfenster, etwa
+`https://192.168.1.42:52341`. Im Handy-Browser aufrufen und `/ca.crt` anhängen,
+die Datei öffnen und installieren:
+
+> Android: **Einstellungen → Sicherheit → Verschlüsselung und Anmeldedaten →
+> Zertifikat installieren → CA-Zertifikat**
+
+**Dieser Schritt ist nicht optional, wenn die App auf dem Startbildschirm
+liegen soll.** Die Zertifikatswarnung bloß wegzuklicken genügt nicht: Der
+Browser verweigert dann den Service Worker &ndash; also kein Icon mit App-Verhalten
+und keine Offline-Ansicht. Verschlüsselt ist die Verbindung zwar so oder so,
+aber die Startbildschirm-App funktioniert nur mit hinterlegter Stelle. Das ist
+geprüft, nicht vermutet.
+
+Android zeigt nach dem Installieren dauerhaft einen Hinweis, dass das Netzwerk
+überwacht werden könnte. Das ist der übliche Warnhinweis für jede
+nutzerinstallierte Stelle und in diesem Fall erwartbar &ndash; die Stelle liegt auf
+deinem eigenen Rechner.
+
+### 4. Auf den Startbildschirm legen
 
 Im Chrome-Menü auf **„Zum Startbildschirm hinzufügen"**. Danach gibt es ein
 Icon wie bei einer installierten App, der Start erfolgt ohne Browserleiste, und
 die zuletzt geöffneten Seiten bleiben lesbar, wenn die Verbindung wegfällt.
 
-Kurse, Auftragsstatus und Anmeldung werden dabei **nie** zwischengespeichert &ndash;
+Kurse, Auftragsstatus und Anmeldung werden **nie** zwischengespeichert &ndash;
 ein zwischengespeicherter Kurs wäre schlimmer als gar keiner, weil er aktuell
 aussieht und es nicht ist.
 
-### Grenzen
+## Was die Verschlüsselung leistet &ndash; und was nicht
+
+| | |
+|---|---|
+| **Behoben** | Mitlesen und Verändern auf dem Übertragungsweg. Wer im selben WLAN lauscht, sieht nur noch verschlüsselten Verkehr. Das Passwort geht nicht mehr im Klartext über die Leitung. |
+| **Nicht behoben** | Erreichbarkeit. Eine **Portfreigabe im Router** setzt die Anwendung weiterhin dem gesamten Internet aus &ndash; dann eben verschlüsselt, mit unbegrenzten Rateversuchen von überall und jeder künftigen Schwachstelle für alle erreichbar. |
+
+**Verschlüsselung ersetzt kein VPN, sie ergänzt es.** Für den Zugriff von
+unterwegs ein VPN verwenden (etwa Tailscale oder WireGuard): kein offener Port,
+verschlüsselt, und von außen sieht niemand, dass da etwas läuft.
+
+## Weitere Grenzen
 
 * **Der Rechner muss laufen.** Das Handy zeigt nur an; gerechnet wird auf dem PC.
-* **Die Verbindung im Heimnetz ist unverschlüsselt** (HTTP). Im eigenen WLAN ist
-  das vertretbar.
-* **Keine Portfreigabe im Router.** Für den Zugriff von unterwegs ein VPN
-  verwenden (etwa Tailscale oder WireGuard) &ndash; damit bleibt kein Port offen,
-  und die Verbindung ist verschlüsselt.
 * Netzzugriff wieder abschalten: `TradingTool.exe passwort --entfernen`
+* Zertifikat neu ausstellen (etwa nach einem Netzwechsel):
+  `TradingTool.exe zertifikat --neu` &ndash; die Stelle bleibt dabei erhalten, das
+  Handy muss also nichts neu installieren.

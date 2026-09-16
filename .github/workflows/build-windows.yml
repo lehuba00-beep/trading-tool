@@ -65,6 +65,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "rules endete mit $LASTEXITCODE" }
           if ($ausgabe -notmatch "Regelbausteine") { throw "rules ohne erwartete Ausgabe" }
 
+          # Belegt zugleich, dass cryptography samt Rust-Anteil im Bundle liegt -
+          # eine haeufige Luecke bei PyInstaller, die erst zur Laufzeit auffaellt.
+          $ausgabe = & dist\TradingTool\TradingTool.exe zertifikat 2>&1 | Out-String
+          Write-Host $ausgabe
+          if ($LASTEXITCODE -ne 0) { throw "zertifikat endete mit $LASTEXITCODE" }
+          if ($ausgabe -notmatch "Zertifikat bereit") { throw "zertifikat ohne erwartete Ausgabe" }
+
       - name: Startversuch Oberflaeche
         # Der eigentliche Anwendungsfall. universe und rules fassen FastAPI,
         # uvicorn und die Vorlagen nicht an - die Exe koennte die

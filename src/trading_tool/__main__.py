@@ -71,7 +71,7 @@ def command_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
     from .ui.app import create_app
-    from .ui.auth import bind_host, lan_ready
+    from .ui.auth import bind_host, lan_ready, tls_active
 
     settings = load_settings()
     bereit, meldung = lan_ready(settings)
@@ -81,19 +81,60 @@ def command_serve(args: argparse.Namespace) -> int:
 
     port = _free_port(args.port or settings.ui.port)
     host = bind_host(settings)
-    url = f"http://127.0.0.1:{port}"
 
+    ssl_argumente = {}
+    schema = "http"
+    if tls_active(settings):
+        from .tls import ensure_certificate
+
+        zertifikat = ensure_certificate(settings.data_dir)
+        ssl_argumente = {
+            "ssl_certfile": str(zertifikat.server_cert),
+            "ssl_keyfile": str(zertifikat.server_key),
+        }
+        schema = "https"
+
+    url = f"{schema}://127.0.0.1:{port}"
     app = create_app(settings)
     if settings.ui.open_browser and not args.no_browser:
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
 
     print(f"\n  Trading-Tool laeuft auf {url}")
     if settings.ui.allow_lan:
-        print(f"  Im Heimnetz erreichbar: http://{_lan_address()}:{port}")
-        print("  Passwortgeschuetzt. Die Verbindung ist unverschluesselt (HTTP) -")
-        print("  fuer den Zugriff von unterwegs ein VPN nutzen, keine Portfreigabe.")
+        adresse = f"{schema}://{_lan_address()}:{port}"
+        print(f"  Im Heimnetz erreichbar: {adresse}")
+        if schema == "https":
+            print("  Verschluesselt und passwortgeschuetzt.")
+            print(f"  Zertifikat fuers Handy: {adresse}/ca.crt  (einmalig hinterlegen)")
+        else:
+            print("  ACHTUNG: unverschluesselt - Passwort und Daten gehen offen durchs Netz.")
+        print("  Fuer den Zugriff von unterwegs ein VPN nutzen, keine Portfreigabe:")
+        print("  Verschluesselung schuetzt den Weg, nicht die Erreichbarkeit.")
     print("  Beenden mit Strg+C\n")
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+    uvicorn.run(app, host=host, port=port, log_level="warning", **ssl_argumente)
+    return 0
+
+
+def command_certificate(args: argparse.Namespace) -> int:
+    """Zertifikat neu ausstellen und den Weg aufs Handy zeigen."""
+    from .tls import ensure_certificate, local_addresses, paths
+
+    settings = load_settings()
+    zertifikat = ensure_certificate(settings.data_dir, force=args.neu)
+    namen, adressen = local_addresses()
+
+    print("\n  Zertifikat bereit.")
+    print(f"  Gueltig fuer: {', '.join(namen)} / {', '.join(adressen)}")
+    print(f"  Stelle:  {paths(settings.data_dir).ca_cert}")
+    print(f"  Server:  {zertifikat.server_cert}")
+    print("\n  Auf dem Handy einmalig hinterlegen:")
+    print(f"    1. https://{_lan_address()}:<Port>/ca.crt im Browser oeffnen")
+    print("    2. Datei oeffnen und als Zertifizierungsstelle installieren")
+    print("       (Android: Einstellungen > Sicherheit > Verschluesselung >")
+    print("        Zertifikat installieren > CA-Zertifikat)")
+    print("\n  Ohne diesen Schritt zeigt der Browser eine Warnung, die sich")
+    print("  einmalig bestaetigen laesst - verschluesselt ist die Verbindung so")
+    print("  oder so.\n")
     return 0
 
 
@@ -303,6 +344,13 @@ def main(argv: list[str] | None = None) -> int:
     passwort.add_argument("--entfernen", action="store_true",
                           help="Passwort loeschen und Netzzugriff abschalten")
     passwort.set_defaults(func=command_password)
+
+    zertifikat = sub.add_parser(
+        "zertifikat", help="Verschluesselung einrichten oder Zertifikat erneuern"
+    )
+    zertifikat.add_argument("--neu", action="store_true",
+                            help="Serverzertifikat neu ausstellen")
+    zertifikat.set_defaults(func=command_certificate)
 
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)

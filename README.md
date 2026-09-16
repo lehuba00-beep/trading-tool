@@ -23,8 +23,9 @@ Hebelprodukte.
 * Warnt, wenn Quartalszahlen in die geplante Haltedauer fallen.
 * Aktualisiert die angezeigten Kurse laufend (verzögert, mit Zeitstempel).
 * Läuft dreimal täglich automatisch: 09:30, 14:00, 22:30.
-* Lässt sich vom Smartphone im Heimnetz bedienen &ndash; passwortgeschützt, mit
-  Kartenansicht statt Tabelle und als App auf dem Startbildschirm.
+* Lässt sich vom Smartphone im Heimnetz bedienen &ndash; verschlüsselt und
+  passwortgeschützt, mit Kartenansicht statt Tabelle und als App auf dem
+  Startbildschirm.
 
 ## Schnellstart
 
@@ -107,6 +108,23 @@ ruff check src tests
   Abrufzeitpunkt und Verzögerung stehen in der Oberfläche.
 * **Quartalstermine sind lückenhaft.** Für ETFs und Indizes gibt es keine, für
   manche Nebenwerte auch nicht. Ein Hinweis, keine Zusicherung.
+
+## Zugriff vom Handy
+
+Kurzfassung (ausführlich in [docs/WINDOWS.md](docs/WINDOWS.md)):
+
+```
+TradingTool.exe passwort --netz    # Passwort setzen, Netzzugriff einschalten
+TradingTool.exe zertifikat         # Verschlüsselung einrichten
+```
+
+Dann die angezeigte Heimnetz-Adresse im Handy-Browser öffnen, unter `/ca.crt`
+die Zertifizierungsstelle installieren und die Seite auf den Startbildschirm
+legen.
+
+**Verschlüsselung ersetzt kein VPN.** Sie schützt den Übertragungsweg im WLAN.
+Eine Portfreigabe im Router setzt die Anwendung weiterhin dem gesamten Internet
+aus. Für den Zugriff von unterwegs ein VPN verwenden, keine Portfreigabe.
 
 ## Rechtlicher Hinweis
 

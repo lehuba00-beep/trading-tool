@@ -72,6 +72,43 @@
 </div>
 
 <section class="card wide">
+  <h2>Zugriff vom Smartphone</h2>
+  <table class="kv">
+    <tr><th>Zugriff aus dem Heimnetz</th>
+        <td>{{ 'eingeschaltet' if settings.ui.allow_lan else 'aus' }}</td></tr>
+    <tr><th>Passwort gesetzt</th>
+        <td>{{ 'ja' if settings.ui.password_hash else 'nein' }}</td></tr>
+    <tr><th>Verbindung</th>
+        <td>{% if settings.ui.allow_lan and settings.ui.use_tls %}
+              verschlüsselt (HTTPS)
+            {% elif settings.ui.allow_lan %}
+              <span class="neg">unverschlüsselt (HTTP)</span>
+            {% else %}nur lokal, Verschlüsselung nicht nötig{% endif %}</td></tr>
+    {% if settings.ui.allow_lan and settings.ui.use_tls %}
+    <tr><th>Zertifizierungsstelle</th>
+        <td><a href="/ca.crt">trading-tool-ca.crt herunterladen</a></td></tr>
+    {% endif %}
+  </table>
+  <p class="muted small">
+    <strong>Die Stelle muss auf dem Handy hinterlegt werden.</strong> Die
+    Zertifikatswarnung bloß wegzuklicken genügt nicht: Der Browser verweigert
+    dann den Service Worker, und damit gibt es keine App auf dem
+    Startbildschirm und keine Offline-Ansicht. Geprüft und bestätigt.
+  </p>
+  <p class="muted small">
+    <strong>Verschlüsselung ersetzt kein VPN.</strong> Sie schützt den
+    Übertragungsweg im WLAN. Eine Portfreigabe im Router setzt die Anwendung
+    weiterhin dem gesamten Internet aus &ndash; dann eben verschlüsselt, mit
+    unbegrenzten Rateversuchen von überall. Für den Zugriff von unterwegs ein
+    VPN verwenden.
+  </p>
+  <p class="muted small">
+    Einrichten: <code>TradingTool.exe passwort --netz</code>, dann
+    <code>TradingTool.exe zertifikat</code>.
+  </p>
+</section>
+
+<section class="card wide">
   <h2>Ablage</h2>
   <table class="kv">
     <tr><th>Datenverzeichnis</th><td><code>{{ settings.data_dir }}</code></td></tr>

@@ -147,6 +147,9 @@ def test_spec_packt_alle_laufzeitdateien_ein():
         assert pflicht in spec, f"{pflicht} fehlt in der PyInstaller-Spezifikation"
     # Ohne tzdata scheitert zoneinfo("Europe/Berlin") unter Windows.
     assert "tzdata" in spec
+    # Der Rust-Anteil von cryptography wird dynamisch geladen und fehlt ohne
+    # ausdrueckliche Nennung im Bundle - das faellt erst zur Laufzeit auf.
+    assert "cryptography.hazmat.bindings._rust" in spec
 
 
 def test_alle_templates_werden_verwendet():

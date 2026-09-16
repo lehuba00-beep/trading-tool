@@ -37,6 +37,12 @@ hiddenimports = [
     # Zeitzonendatenbank - Windows hat keine eigene.
     "tzdata",
     "zoneinfo",
+    # Zertifikatserzeugung fuer die verschluesselte Verbindung. Der
+    # Rust-Anteil wird dynamisch geladen und ist ohne Nennung nicht im Bundle.
+    "cryptography",
+    "cryptography.hazmat.bindings._rust",
+    "cryptography.hazmat.backends.openssl",
+    "cryptography.x509",
 ] + collect_submodules("apscheduler") + collect_submodules("trading_tool")
 
 a = Analysis(
