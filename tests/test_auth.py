@@ -56,6 +56,41 @@ def test_schluessel_bleibt_ueber_neustarts_gleich(tmp_path):
     assert load_or_create_secret(tmp_path) == load_or_create_secret(tmp_path)
 
 
+def test_schluessel_mit_randzeichen_wird_unveraendert_gelesen(tmp_path):
+    """Der Schluessel ist Binaerdaten. Rund jedes zwanzigste Zufallsbyte am
+    Rand ist zufaellig ein Zeichen, das strip() entfernen wuerde - der
+    gelesene Schluessel waere dann ein anderer als der geschriebene."""
+    from trading_tool.ui.auth import SECRET_FILE
+
+    heikel = b"\n\t " + b"\x01" * 42 + b" \r\n"
+    (tmp_path / SECRET_FILE).write_bytes(heikel)
+    assert load_or_create_secret(tmp_path) == heikel
+
+
+def test_zu_kurzer_schluessel_wird_ersetzt(tmp_path):
+    from trading_tool.ui.auth import SECRET_FILE
+
+    (tmp_path / SECRET_FILE).write_bytes(b"zu kurz")
+    schluessel = load_or_create_secret(tmp_path)
+    assert len(schluessel) >= 32
+    assert schluessel != b"zu kurz"
+
+
+def test_schluessel_ist_auch_bei_vielen_durchlaeufen_stabil(tmp_path):
+    """Gegen den Zufall: Der urspruengliche Fehler trat nur in etwa
+    4,6 Prozent der Faelle auf und blieb deshalb lange unbemerkt."""
+    from trading_tool.ui.auth import SECRET_FILE
+
+    for durchlauf in range(60):
+        verzeichnis = tmp_path / f"lauf{durchlauf}"
+        verzeichnis.mkdir()
+        erst = load_or_create_secret(verzeichnis)
+        assert load_or_create_secret(verzeichnis) == erst, (
+            f"Durchlauf {durchlauf}: Schluessel nach Neustart veraendert"
+        )
+        assert (verzeichnis / SECRET_FILE).read_bytes() == erst
+
+
 def test_token_ist_ohne_schluessel_nicht_faelschbar(tmp_path):
     schluessel = load_or_create_secret(tmp_path)
     token = issue_token(schluessel)

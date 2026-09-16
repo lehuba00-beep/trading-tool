@@ -76,6 +76,11 @@
   <table class="kv">
     <tr><th>Zugriff aus dem Heimnetz</th>
         <td>{{ 'eingeschaltet' if settings.ui.allow_lan else 'aus' }}</td></tr>
+    <tr><th>Port</th>
+        <td>{{ settings.ui.port or 'automatisch (wechselt bei jedem Start)' }}
+        {% if settings.ui.allow_lan and settings.ui.port %}
+          <span class="muted small">&ndash; bleibt über Neustarts gleich</span>
+        {% endif %}</td></tr>
     <tr><th>Passwort gesetzt</th>
         <td>{{ 'ja' if settings.ui.password_hash else 'nein' }}</td></tr>
     <tr><th>Verbindung</th>

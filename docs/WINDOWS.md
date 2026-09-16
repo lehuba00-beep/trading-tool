@@ -103,6 +103,16 @@ Sonst könnte jedes Gerät im WLAN die Watchlist lesen und Screenings auslösen.
 Das Passwort wird nur abgeleitet gespeichert (pbkdf2 mit zufälligem Salz), nie
 im Klartext.
 
+Der Befehl trägt zugleich den festen Port **8443** ein. Ohne Netzzugriff sucht
+sich die Anwendung bei jedem Start einen freien Port &ndash; auf dem Rechner selbst
+egal, vom Handy aus lästig, weil sich die Adresse dann jedes Mal ändert. Mit
+festem Port bleibt sie gleich und lässt sich als Lesezeichen speichern. Ändern
+lässt sich das in `settings.yaml` unter `ui.port`.
+
+Ist der Port belegt, weicht die Anwendung aus **und sagt es beim Start** &ndash;
+still auszuweichen wäre das Schlimmste, weil dann das Lesezeichen ins Leere
+zeigt, ohne dass jemand erfährt, warum.
+
 ### 2. Verschlüsselung einrichten
 
 ```
@@ -163,7 +173,17 @@ verschlüsselt, und von außen sieht niemand, dass da etwas läuft.
 
 ## Weitere Grenzen
 
-* **Der Rechner muss laufen.** Das Handy zeigt nur an; gerechnet wird auf dem PC.
+* **Der Rechner muss laufen** &ndash; und wach sein. Bildschirm aus ist egal, aber
+  Energiesparmodus und Ruhezustand stoppen den Server. Wer regelmäßig vom Handy
+  aus draufschaut, stellt den Standby in den Energieoptionen ab.
+* **Beide Geräte im selben WLAN.** Über Mobilfunk geht es nicht, im Gäste-WLAN
+  meist auch nicht &ndash; Router schotten die Geräte darin voneinander ab.
+* **Die IP kann sich ändern**, etwa nach einem Router-Neustart. Entweder im
+  Router eine feste Adresse vergeben, oder statt der IP den Rechnernamen
+  verwenden: `https://<rechnername>.local:8443` &ndash; der steht mit im Zertifikat.
+  Wechselt die Adresse doch, stellt die Anwendung das Serverzertifikat beim
+  Start selbst neu aus; die Zertifizierungsstelle bleibt gültig, auf dem Handy
+  ist also nichts nachzuinstallieren.
 * Netzzugriff wieder abschalten: `TradingTool.exe passwort --entfernen`
 * Zertifikat neu ausstellen (etwa nach einem Netzwechsel):
   `TradingTool.exe zertifikat --neu` &ndash; die Stelle bleibt dabei erhalten, das

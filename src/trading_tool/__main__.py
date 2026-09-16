@@ -17,7 +17,7 @@ import threading
 import webbrowser
 from pathlib import Path
 
-from .config import load_settings
+from .config import DEFAULT_LAN_PORT, load_settings
 
 
 def _setup_logging(verbose: bool = False) -> None:
@@ -39,15 +39,20 @@ def _setup_logging(verbose: bool = False) -> None:
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
 
 
-def _free_port(preferred: int = 0) -> int:
-    """Freien Port suchen. Ein fest verdrahteter Port kollidiert irgendwann."""
+def _free_port(preferred: int = 0) -> tuple[int, bool]:
+    """(Port, ob ausgewichen wurde).
+
+    Ob ausgewichen wurde, ist beim Zugriff vom Handy wichtig: Dann stimmt das
+    Lesezeichen nicht mehr, und das muss sichtbar sein statt still zu
+    passieren.
+    """
     if preferred:
         with socket.socket() as probe:
             if probe.connect_ex(("127.0.0.1", preferred)) != 0:
-                return preferred
+                return preferred, False
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
-        return int(probe.getsockname()[1])
+        return int(probe.getsockname()[1]), bool(preferred)
 
 
 def _lan_address() -> str:
@@ -79,7 +84,8 @@ def command_serve(args: argparse.Namespace) -> int:
         print(f"\n  {meldung}\n")
         return 2
 
-    port = _free_port(args.port or settings.ui.port)
+    gewuenscht = args.port or settings.ui.preferred_port()
+    port, ausgewichen = _free_port(gewuenscht)
     host = bind_host(settings)
 
     ssl_argumente = {}
@@ -100,6 +106,12 @@ def command_serve(args: argparse.Namespace) -> int:
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
 
     print(f"\n  Trading-Tool laeuft auf {url}")
+    if ausgewichen:
+        print(f"  Hinweis: Port {gewuenscht} ist belegt, daher {port}.")
+        if settings.ui.allow_lan:
+            print("  Ein Lesezeichen auf dem Handy zeigt damit ins Leere -")
+            print("  entweder das belegende Programm beenden oder in")
+            print("  settings.yaml unter ui.port einen anderen Port eintragen.")
     if settings.ui.allow_lan:
         adresse = f"{schema}://{_lan_address()}:{port}"
         print(f"  Im Heimnetz erreichbar: {adresse}")
@@ -163,13 +175,25 @@ def command_password(args: argparse.Namespace) -> int:
         return 2
 
     settings.ui.password_hash = hash_password(erstes)
+    fester_port = 0
     if args.netz:
         settings.ui.allow_lan = True
+        if not settings.ui.port:
+            # Ausdruecklich in die Einstellungen schreiben statt nur als
+            # Vorgabe zu verwenden: So steht die Adresse sichtbar in der
+            # Datei und laesst sich dort aendern.
+            settings.ui.port = DEFAULT_LAN_PORT
+            fester_port = DEFAULT_LAN_PORT
     save_settings(settings)
 
     print("\n  Passwort gesetzt.")
     if settings.ui.allow_lan:
-        print(f"  Zugriff aus dem Heimnetz ist eingeschaltet (http://{_lan_address()}:...).")
+        adresse = f"https://{_lan_address()}:{settings.ui.port}"
+        print(f"  Zugriff aus dem Heimnetz ist eingeschaltet: {adresse}")
+        if fester_port:
+            print(f"  Fester Port {fester_port} eingetragen - die Adresse bleibt damit")
+            print("  ueber Neustarts gleich und laesst sich als Lesezeichen speichern.")
+        print("\n  Naechster Schritt:  TradingTool.exe zertifikat")
     else:
         print("  Zugriff aus dem Netz ist weiterhin aus.")
         print("  Einschalten mit:  TradingTool.exe passwort --netz")

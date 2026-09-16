@@ -91,6 +91,13 @@ class ScreeningSettings(BaseModel):
     )
 
 
+# Fester Port fuer den Zugriff aus dem Heimnetz. Ein wechselnder Port waere
+# auf dem Rechner selbst folgenlos - vom Handy aus muesste man die Adresse
+# nach jedem Start neu nachschlagen. 8443 ist der uebliche Ausweichport fuer
+# verschluesselte Verbindungen und kollidiert selten.
+DEFAULT_LAN_PORT = 8443
+
+
 class QuoteSettings(BaseModel):
     """Laufend aktualisierte Kurse.
 
@@ -128,9 +135,16 @@ class EarningsSettings(BaseModel):
 class UISettings(BaseModel):
     host: str = "127.0.0.1"
     port: int = 0
-    """0 = freien Port waehlen. Ein fest verdrahteter Port kollidiert frueher
-    oder spaeter mit etwas anderem auf dem Rechner."""
+    """0 = automatisch. Ohne Netzzugriff wird ein freier Port gewaehlt, mit
+    Netzzugriff der feste Vorgabeport - sonst aendert sich die Adresse fuers
+    Handy bei jedem Start."""
     open_browser: bool = True
+
+    def preferred_port(self) -> int:
+        """Gewuenschter Port. 0 heisst 'irgendeiner, Hauptsache frei'."""
+        if self.port:
+            return self.port
+        return DEFAULT_LAN_PORT if self.allow_lan else 0
 
     allow_lan: bool = False
     """Zugriff aus dem Heimnetz, etwa vom Handy. Erfordert ein Passwort -

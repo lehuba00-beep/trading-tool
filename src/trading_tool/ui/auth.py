@@ -66,7 +66,11 @@ def load_or_create_secret(data_dir: Path) -> bytes:
     sonst waere man nach jedem Start wieder abgemeldet."""
     pfad = data_dir / SECRET_FILE
     if pfad.exists():
-        roh = pfad.read_bytes().strip()
+        # Ausdruecklich ohne strip(): Der Schluessel ist Binaerdaten, und rund
+        # jedes zwanzigste Zufallsbyte am Rand ist zufaellig ein Zeichen, das
+        # strip() entfernt. Der gelesene Schluessel waere dann ein anderer als
+        # der geschriebene - und alle Sitzungen nach einem Neustart ungueltig.
+        roh = pfad.read_bytes()
         if len(roh) >= 32:
             return roh
 
