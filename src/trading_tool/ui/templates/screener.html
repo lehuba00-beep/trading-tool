@@ -50,9 +50,9 @@
   <tbody>
   {% for s in signals %}
     <tr>
-      <td><span class="score">{{ s.score|zahl(0) }}</span>
+      <td class="cell-head"><span class="score">{{ s.score|zahl(0) }}</span>
         {% if s.provisional %}<span class="tag prov" title="Beruht auf einem noch nicht abgeschlossenen Tagesbalken">vorlaeufig</span>{% endif %}</td>
-      <td><a href="/instrument/{{ s.isin }}?strategie={{ name }}">{{ s.name }}</a>
+      <td class="cell-title"><a href="/instrument/{{ s.isin }}?strategie={{ name }}">{{ s.name }}</a>
         <br><span class="muted small">{{ s.isin }}</span>
         {% if s.quality != 'ok' %}
           <br><span class="tag {{ s.quality }}"
@@ -64,24 +64,24 @@
             Zahlen in {{ s.earnings_in_days() }} Tagen</span>
         {% endif %}
       </td>
-      <td class="num" data-kurs="{{ s.isin }}">
+      <td class="num" data-label="Kurs (EUR)" data-kurs="{{ s.isin }}">
         <span class="kurs-wert">{{ s.metrics.get('kurs_eur')|zahl }}</span>
         <span class="kurs-delta"></span>
       </td>
-      <td class="num {{ 'pos' if (s.metrics.get('perf_20d_pct') or 0) > 0 else 'neg' }}">
+      <td class="num {{ 'pos' if (s.metrics.get('perf_20d_pct') or 0) > 0 else 'neg' }}" data-label="20 Tage">
         {{ s.metrics.get('perf_20d_pct')|zahl(1) }} %</td>
-      <td class="num">{{ s.metrics.get('abstand_52w_hoch_pct')|zahl(1) }} %</td>
-      <td class="num">{{ s.metrics.get('atr_pct')|zahl(1) }}</td>
-      <td class="num">{{ s.metrics.get('stop')|zahl }}</td>
-      <td class="num">{{ s.metrics.get('ziel')|zahl }}</td>
-      <td class="num">{{ s.metrics.get('umsatz_20d_eur')|geld }}</td>
-      <td class="rules" title="{{ s.triggered_labels|join(' | ') }}">
+      <td class="num" data-label="zum 52W-Hoch">{{ s.metrics.get('abstand_52w_hoch_pct')|zahl(1) }} %</td>
+      <td class="num" data-label="ATR %">{{ s.metrics.get('atr_pct')|zahl(1) }}</td>
+      <td class="num" data-label="Stop (aus dem Lauf)">{{ s.metrics.get('stop')|zahl }}</td>
+      <td class="num" data-label="Ziel (aus dem Lauf)">{{ s.metrics.get('ziel')|zahl }}</td>
+      <td class="num" data-label="Umsatz">{{ s.metrics.get('umsatz_20d_eur')|geld }}</td>
+      <td class="rules cell-full" data-label="Ausgelöste Regeln" title="{{ s.triggered_labels|join(' | ') }}">
         {% for label in s.triggered_labels[:3] %}<span class="tag hit">{{ label }}</span>{% endfor %}
         {% if s.triggered_labels|length > 3 %}
           <span class="tag more">+{{ s.triggered_labels|length - 3 }} weitere</span>
         {% endif %}
       </td>
-      <td><span class="tag st-{{ s.tr_status.value }}">{{ s.tr_status.label }}</span></td>
+      <td data-label="Trade Republic"><span class="tag st-{{ s.tr_status.value }}">{{ s.tr_status.label }}</span></td>
       <td>
         {% if s.isin in watched %}
           <form method="post" action="/watchlist/remove">

@@ -1,0 +1,22 @@
+{
+  "name": "Trading-Tool",
+  "short_name": "Trading",
+  "description": "Analyse- und Screening-Werkzeug für kurz-, mittel- und langfristige Handelschancen. Keine Anlageberatung.",
+  "lang": "de",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#14161a",
+  "theme_color": "#14161a",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Kurzfristig - Rücksetzer", "url": "/screener/kurz_pullback" },
+    { "name": "Swing", "url": "/screener/swing" },
+    { "name": "Watchlist", "url": "/watchlist" }
+  ]
+}

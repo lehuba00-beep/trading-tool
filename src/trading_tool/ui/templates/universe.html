@@ -36,20 +36,20 @@
   <tbody>
   {% for i in instruments %}
     <tr>
-      <td><a href="/instrument/{{ i.isin }}">{{ i.name }}</a></td>
-      <td class="muted small">{{ i.isin }}</td>
-      <td class="muted small">{{ i.ticker_yahoo }}</td>
-      <td>{{ i.asset_class.value }}</td>
-      <td>{{ i.currency }}</td>
-      <td><span class="tag st-{{ i.tr_status.value }}">{{ i.tr_status.label }}</span></td>
-      <td class="muted small">
+      <td class="cell-title"><a href="/instrument/{{ i.isin }}">{{ i.name }}</a></td>
+      <td class="muted small" data-label="ISIN">{{ i.isin }}</td>
+      <td class="muted small" data-label="Ticker">{{ i.ticker_yahoo }}</td>
+      <td data-label="Klasse">{{ i.asset_class.value }}</td>
+      <td data-label="Währung">{{ i.currency }}</td>
+      <td data-label="TR-Status"><span class="tag st-{{ i.tr_status.value }}">{{ i.tr_status.label }}</span></td>
+      <td class="muted small" data-label="geprüft am">
         {{ i.tr_checked_at.strftime('%d.%m.%Y') if i.tr_checked_at else '-' }}
         {% if i.tr_checked_at and i.tr_checked_at < stale_cutoff %}
           <span class="tag prov" title="Pruefung aelter als das eingestellte Intervall">veraltet</span>
         {% endif %}
       </td>
-      <td class="muted small">{{ i.source }}</td>
-      <td class="nowrap">
+      <td class="muted small" data-label="Quelle">{{ i.source }}</td>
+      <td class="nowrap cell-full" data-label="Handelbarkeit">
         <form method="post" action="/universe/{{ i.isin }}/status" class="inline">
           <input type="hidden" name="status" value="verified">
           <input type="hidden" name="zurueck" value="/universe?q={{ q }}&status={{ status }}&klasse={{ klasse }}">

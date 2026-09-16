@@ -243,3 +243,102 @@ footer p { margin: 0 0 7px; }
   display: block; font-weight: 400; font-size: 10.5px; color: var(--muted);
   text-transform: none; letter-spacing: 0;
 }
+
+/* =======================================================================
+   Smartphone-Ansicht
+
+   Eine zwoelfspaltige Tabelle passt auf keinen Handyschirm - bei 412 px
+   Breite braeuchte sie knapp 1200 px. Statt sie zu quetschen oder seitlich
+   scrollen zu lassen, wird jede Zeile zu einer Karte: Score und Titel als
+   Kopf, die Kennzahlen als Beschriftung-Wert-Paare darunter.
+
+   Die Beschriftungen kommen aus data-label am jeweiligen Feld, damit es bei
+   einer Auszeichnung bleibt und nicht zwei Fassungen derselben Tabelle gibt.
+   ======================================================================= */
+@media (max-width: 720px) {
+  main { padding: 14px; }
+  h1 { font-size: 21px; }
+
+  /* Navigation als eine seitlich schiebbare Zeile statt sechs Zeilen Block */
+  .topbar { padding: 10px 0 0; gap: 0; display: block; }
+  .brand { padding: 0 14px 8px; display: block; }
+  .topbar nav {
+    display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 16px;
+    padding: 0 14px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .topbar nav::-webkit-scrollbar { display: none; }
+  .topbar nav a { white-space: nowrap; padding-bottom: 8px; }
+
+  .toolbar { gap: 8px; }
+  .toolbar form { flex: 0 0 auto; }
+  button, .btn { padding: 9px 14px; }
+
+  /* Tabellen als Karten */
+  table.grid, table.grid tbody, table.grid tr, table.grid td { display: block; width: 100%; }
+  table.grid thead { display: none; }
+  table.grid tr {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px;
+  }
+  table.grid tbody tr:hover { background: var(--surface); }
+  table.grid td {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    padding: 6px 0; border-bottom: 1px solid var(--border); text-align: right;
+  }
+  table.grid td::before {
+    content: attr(data-label); color: var(--muted); font-size: 12.5px;
+    text-align: left; flex: 0 0 auto; font-weight: 400;
+  }
+  table.grid td:last-child { border-bottom: none; }
+  table.grid td:empty { display: none; }
+
+  /* Kopfzeile der Karte: Titel links, Score rechts daneben in der Ecke.
+     Getrennte Tabellenzellen lassen sich nicht nebeneinander setzen - der
+     Score wird deshalb aus dem Fluss genommen. */
+  table.grid tr { position: relative; }
+  table.grid td.cell-head {
+    position: absolute; top: 12px; right: 14px; width: auto;
+    border-bottom: none; padding: 0; text-align: right; display: block;
+  }
+  table.grid td.cell-head::before { content: none; }
+  table.grid td.cell-title {
+    flex-direction: column; align-items: flex-start; gap: 2px;
+    border-bottom: 1px solid var(--border); padding: 0 56px 10px 0; margin-bottom: 4px;
+    font-size: 15px;
+  }
+  table.grid td.cell-title::before { content: none; }
+
+  /* Kurs und Veraenderung gehoeren zusammen an den rechten Rand */
+  table.grid td[data-kurs] .kurs-wert { margin-left: auto; }
+  table.grid td[data-kurs] .kurs-delta { display: inline; margin-left: 10px; }
+
+  /* Breite Felder ueber die ganze Karte, Beschriftung darueber.
+     Bewusst block statt flex: Als Flex-Element bekaeme jede Marke eine
+     eigene Zeile, und die Karte waere doppelt so hoch. */
+  table.grid td.cell-full { display: block; text-align: left; }
+  table.grid td.cell-full::before {
+    display: block; font-size: 12px; margin-bottom: 5px;
+  }
+  td.rules { max-width: none; }
+
+  .split, .cards { grid-template-columns: 1fr; }
+  .chart-wrap { padding: 6px; }
+  table.kv th { font-size: 13px; }
+  .kurs-stand { width: 100%; }
+}
+
+/* Anmeldeseite */
+.login-seite { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+main.login {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 28px; width: min(380px, calc(100vw - 32px)); margin: 0;
+}
+main.login h1 { margin-bottom: 18px; }
+main.login label { display: block; margin-bottom: 6px; font-size: 14px; color: var(--muted); }
+main.login input[type=password] {
+  width: 100%; font: inherit; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: 7px; background: var(--bg); color: var(--text); margin-bottom: 14px;
+}
+main.login button { width: 100%; }
+main.login .banner { margin-top: 0; }
+main.login p { margin-top: 18px; }

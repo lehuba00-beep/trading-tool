@@ -26,19 +26,19 @@
   <tbody>
   {% for instrument, bericht in berichte %}
     <tr>
-      <td><a href="/instrument/{{ instrument.isin }}">{{ instrument.name }}</a>
+      <td class="cell-title"><a href="/instrument/{{ instrument.isin }}">{{ instrument.name }}</a>
         <br><span class="muted small">{{ instrument.ticker_yahoo }}</span></td>
-      <td>
+      <td class="cell-full" data-label="Befund">
         {% if bericht.ok %}<span class="tag hit">in Ordnung</span>{% endif %}
         {% for f in bericht.findings %}
           <span class="tag {{ f.severity.value }}">{{ f.message }}</span>
         {% endfor %}
       </td>
-      <td class="muted small">
+      <td class="muted small cell-full" data-label="Bedeutung">
         {% for f in bericht.findings %}<div>{{ f.detail }}</div>{% endfor %}
       </td>
-      <td class="num">{{ bericht.bars }}</td>
-      <td class="muted small">{{ bericht.last_bar.strftime('%d.%m.%Y') if bericht.last_bar else '-' }}</td>
+      <td class="num" data-label="Balken">{{ bericht.bars }}</td>
+      <td class="muted small" data-label="letzter Kurs">{{ bericht.last_bar.strftime('%d.%m.%Y') if bericht.last_bar else '-' }}</td>
     </tr>
   {% endfor %}
   </tbody>

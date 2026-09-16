@@ -50,22 +50,89 @@ def _free_port(preferred: int = 0) -> int:
         return int(probe.getsockname()[1])
 
 
+def _lan_address() -> str:
+    """Eigene Adresse im Heimnetz ermitteln.
+
+    Der Umweg ueber eine Verbindung nach aussen ist der zuverlaessigste Weg,
+    die richtige Schnittstelle zu finden - es werden dabei keine Daten
+    gesendet, das Betriebssystem waehlt nur die Route.
+    """
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("192.0.2.1", 9))  # Adresse aus dem Dokumentationsbereich
+        return str(probe.getsockname()[0])
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        probe.close()
+
+
 def command_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
     from .ui.app import create_app
+    from .ui.auth import bind_host, lan_ready
 
     settings = load_settings()
+    bereit, meldung = lan_ready(settings)
+    if not bereit:
+        print(f"\n  {meldung}\n")
+        return 2
+
     port = _free_port(args.port or settings.ui.port)
-    url = f"http://{settings.ui.host}:{port}"
+    host = bind_host(settings)
+    url = f"http://127.0.0.1:{port}"
 
     app = create_app(settings)
     if settings.ui.open_browser and not args.no_browser:
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
 
     print(f"\n  Trading-Tool laeuft auf {url}")
+    if settings.ui.allow_lan:
+        print(f"  Im Heimnetz erreichbar: http://{_lan_address()}:{port}")
+        print("  Passwortgeschuetzt. Die Verbindung ist unverschluesselt (HTTP) -")
+        print("  fuer den Zugriff von unterwegs ein VPN nutzen, keine Portfreigabe.")
     print("  Beenden mit Strg+C\n")
-    uvicorn.run(app, host=settings.ui.host, port=port, log_level="warning")
+    uvicorn.run(app, host=host, port=port, log_level="warning")
+    return 0
+
+
+def command_password(args: argparse.Namespace) -> int:
+    """Passwort fuer den Zugriff aus dem Netz setzen oder entfernen."""
+    import getpass
+
+    from .config import save_settings
+    from .ui.auth import hash_password
+
+    settings = load_settings()
+
+    if args.entfernen:
+        settings.ui.password_hash = ""
+        settings.ui.allow_lan = False
+        save_settings(settings)
+        print("\n  Passwort entfernt. Der Zugriff aus dem Netz ist wieder aus.\n")
+        return 0
+
+    erstes = getpass.getpass("  Neues Passwort: ")
+    if len(erstes) < 8:
+        print("\n  Zu kurz - mindestens acht Zeichen.\n")
+        return 2
+    if erstes != getpass.getpass("  Wiederholen:    "):
+        print("\n  Die Eingaben stimmen nicht ueberein.\n")
+        return 2
+
+    settings.ui.password_hash = hash_password(erstes)
+    if args.netz:
+        settings.ui.allow_lan = True
+    save_settings(settings)
+
+    print("\n  Passwort gesetzt.")
+    if settings.ui.allow_lan:
+        print(f"  Zugriff aus dem Heimnetz ist eingeschaltet (http://{_lan_address()}:...).")
+    else:
+        print("  Zugriff aus dem Netz ist weiterhin aus.")
+        print("  Einschalten mit:  TradingTool.exe passwort --netz")
+    print()
     return 0
 
 
@@ -227,6 +294,15 @@ def main(argv: list[str] | None = None) -> int:
 
     rules = sub.add_parser("rules", help="Verfuegbare Regelbausteine auflisten")
     rules.set_defaults(func=command_rules)
+
+    passwort = sub.add_parser(
+        "passwort", help="Passwort fuer den Zugriff aus dem Heimnetz setzen"
+    )
+    passwort.add_argument("--netz", action="store_true",
+                          help="Zugriff aus dem Heimnetz zugleich einschalten")
+    passwort.add_argument("--entfernen", action="store_true",
+                          help="Passwort loeschen und Netzzugriff abschalten")
+    passwort.set_defaults(func=command_password)
 
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)

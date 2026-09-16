@@ -23,6 +23,8 @@ Hebelprodukte.
 * Warnt, wenn Quartalszahlen in die geplante Haltedauer fallen.
 * Aktualisiert die angezeigten Kurse laufend (verzögert, mit Zeitstempel).
 * Läuft dreimal täglich automatisch: 09:30, 14:00, 22:30.
+* Lässt sich vom Smartphone im Heimnetz bedienen &ndash; passwortgeschützt, mit
+  Kartenansicht statt Tabelle und als App auf dem Startbildschirm.
 
 ## Schnellstart
 

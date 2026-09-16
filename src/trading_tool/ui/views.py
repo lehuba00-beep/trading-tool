@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, timedelta
+from urllib.parse import quote
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
@@ -14,6 +15,7 @@ from ..quality import Severity, check_series
 from ..reporting import to_csv, to_xlsx
 from ..screener.ranking import sort_signals
 from ..strategies.context import IndicatorContext
+from .auth import COOKIE_NAME, SESSION_MAX_AGE, issue_token, verify_password
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,6 +34,7 @@ def _render(request: Request, template: str, **context) -> HTMLResponse:
     context.setdefault("strategies", state.active_strategies())
     context.setdefault("job", state.jobs.state)
     context.setdefault("kurs_status", state.quotes.status())
+    context.setdefault("geschuetzt", bool(state.settings.ui.password_hash))
     context.setdefault("request", request)
     return _templates(request).TemplateResponse(request, template, context)
 
@@ -103,6 +106,91 @@ def job_status(request: Request):
     """HTMX-Fragment: Fortschrittsanzeige, alle zwei Sekunden abgefragt."""
     state = _state(request)
     return _render(request, "_job.html", job=state.jobs.state, pending=state.jobs.pending)
+
+
+# ------------------------------------------------------------------ PWA
+
+@router.get("/manifest.webmanifest", include_in_schema=False)
+def manifest(request: Request):
+    from .state import static_dir
+
+    return FileResponse(static_dir() / "manifest.webmanifest",
+                        media_type="application/manifest+json")
+
+
+@router.get("/sw.js", include_in_schema=False)
+def service_worker(request: Request):
+    """Muss von der Wurzel ausgeliefert werden.
+
+    Ein Service Worker darf nur den Pfad steuern, unter dem er selbst liegt -
+    unter /static/ koennte er die Anwendung nicht bedienen.
+    """
+    from .state import static_dir
+
+    return FileResponse(
+        static_dir() / "sw.js", media_type="text/javascript",
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+    )
+
+
+@router.get("/icons/{name}", include_in_schema=False)
+def icon(request: Request, name: str):
+    from .state import static_dir
+
+    pfad = (static_dir() / "icons" / name).resolve()
+    erlaubt = (static_dir() / "icons").resolve()
+    # Pfad einsperren: Ohne diese Pruefung liesse sich ueber ../ jede Datei
+    # des Rechners abrufen.
+    if not str(pfad).startswith(str(erlaubt)) or not pfad.is_file():
+        return RedirectResponse("/static/icons/icon-192.png", status_code=303)
+    return FileResponse(pfad, media_type="image/png")
+
+
+# ------------------------------------------------------------------ Anmeldung
+
+@router.get("/anmelden", response_class=HTMLResponse)
+def anmelden_formular(request: Request, weiter: str = "/", fehler: int = 0):
+    state = _state(request)
+    if not state.settings.ui.password_hash:
+        return RedirectResponse("/", status_code=303)
+    return _templates(request).TemplateResponse(
+        request, "login.html",
+        {"request": request, "weiter": weiter, "fehler": bool(fehler),
+         "strategies": {}, "kurs_status": {"aktiv": False, "intervall": 0}},
+    )
+
+
+@router.post("/anmelden")
+async def anmelden(request: Request, passwort: str = Form(...), weiter: str = Form(default="/")):
+    import asyncio
+
+    state = _state(request)
+    bremse = request.app.state.throttle
+
+    if not verify_password(passwort, state.settings.ui.password_hash):
+        # Verzoegerung nach Fehlversuch: macht systematisches Durchprobieren
+        # unbrauchbar, ohne den Nutzer auszusperren.
+        await asyncio.sleep(bremse.failed())
+        ziel = f"/anmelden?fehler=1&weiter={quote(weiter, safe='')}"
+        return RedirectResponse(ziel, status_code=303)
+
+    bremse.succeeded()
+    # Nur eigene Pfade als Ziel zulassen - sonst liesse sich die Anmeldung
+    # nutzen, um auf eine fremde Adresse weiterzuleiten.
+    ziel = weiter if weiter.startswith("/") and not weiter.startswith("//") else "/"
+    antwort = RedirectResponse(ziel, status_code=303)
+    antwort.set_cookie(
+        COOKIE_NAME, issue_token(request.app.state.secret),
+        max_age=SESSION_MAX_AGE, httponly=True, samesite="lax",
+    )
+    return antwort
+
+
+@router.post("/abmelden")
+def abmelden(request: Request):
+    antwort = RedirectResponse("/anmelden", status_code=303)
+    antwort.delete_cookie(COOKIE_NAME)
+    return antwort
 
 
 # ------------------------------------------------------------------ Kurse

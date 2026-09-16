@@ -166,3 +166,16 @@ def strategies():
 @pytest.fixture
 def yesterday() -> date:
     return date.today() - timedelta(days=1)
+
+
+@pytest.fixture
+def client(seeded, settings):
+    """Angemeldeter Zugriff auf die Oberflaeche - ohne Passwort, ohne Zeitsteuerung."""
+    from fastapi.testclient import TestClient
+
+    from trading_tool.ui.app import create_app
+
+    settings.schedule.enabled = False
+    settings.ui.open_browser = False
+    with TestClient(create_app(settings)) as test_client:
+        yield test_client

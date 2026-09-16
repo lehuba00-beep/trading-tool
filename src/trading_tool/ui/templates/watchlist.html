@@ -14,11 +14,11 @@
   <tbody>
   {% for e in entries %}
     <tr>
-      <td><a href="/instrument/{{ e.isin }}">{{ e.name or e.isin }}</a></td>
-      <td class="muted small">{{ e.isin }}</td>
-      <td>{{ e.asset_class }}</td>
-      <td><span class="tag st-{{ e.tr_status }}">{{ e.tr_status }}</span></td>
-      <td class="muted">{{ e.added_at }}</td>
+      <td class="cell-title"><a href="/instrument/{{ e.isin }}">{{ e.name or e.isin }}</a></td>
+      <td class="muted small" data-label="ISIN">{{ e.isin }}</td>
+      <td data-label="Klasse">{{ e.asset_class }}</td>
+      <td data-label="TR-Status"><span class="tag st-{{ e.tr_status }}">{{ e.tr_status }}</span></td>
+      <td class="muted" data-label="aufgenommen">{{ e.added_at }}</td>
       <td>
         <form method="post" action="/watchlist/remove">
           <input type="hidden" name="isin" value="{{ e.isin }}">

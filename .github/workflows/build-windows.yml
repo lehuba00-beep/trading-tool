@@ -94,7 +94,8 @@ jobs:
             # PyInstaller fehlen genau solche Dateien gern im Bundle.
             foreach ($pfad in @("/screener/kurz_pullback", "/universe", "/einstellungen",
                                 "/datenqualitaet", "/kurse",
-                                "/static/app.css", "/static/poll.js")) {
+                                "/static/app.css", "/static/poll.js", "/static/pwa.js",
+                                "/manifest.webmanifest", "/sw.js", "/icons/icon-192.png")) {
               $r = Invoke-WebRequest -Uri "http://127.0.0.1:8765$pfad" -UseBasicParsing -TimeoutSec 10
               if ($r.StatusCode -ne 200) { $erreichbar = $false; Write-Host "FEHLT: $pfad" }
             }

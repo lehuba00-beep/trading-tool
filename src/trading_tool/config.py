@@ -132,6 +132,12 @@ class UISettings(BaseModel):
     oder spaeter mit etwas anderem auf dem Rechner."""
     open_browser: bool = True
 
+    allow_lan: bool = False
+    """Zugriff aus dem Heimnetz, etwa vom Handy. Erfordert ein Passwort -
+    ohne eines verweigert die Anwendung den Start im Netz."""
+    password_hash: str = ""
+    """Abgeleitetes Passwort. Klartext wird nie gespeichert."""
+
 
 class Settings(BaseModel):
     provider: ProviderSettings = Field(default_factory=ProviderSettings)

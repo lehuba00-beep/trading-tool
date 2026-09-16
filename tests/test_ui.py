@@ -17,15 +17,6 @@ from trading_tool.ui.charts import candlestick
 from .conftest import trending_series
 
 
-@pytest.fixture
-def client(seeded, settings):
-    settings.schedule.enabled = False  # keine Hintergrundlaeufe im Test
-    settings.ui.open_browser = False
-    app = create_app(settings)
-    with TestClient(app) as test_client:
-        yield test_client
-
-
 def test_startseite_zeigt_alle_strategien(client):
     response = client.get("/")
     assert response.status_code == 200

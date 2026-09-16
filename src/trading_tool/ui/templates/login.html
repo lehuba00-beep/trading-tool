@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anmelden &ndash; Trading-Tool</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="login-seite">
+<main class="login">
+  <h1>Trading-Tool</h1>
+  {% if fehler %}
+    <p class="banner warn">Passwort falsch.</p>
+  {% endif %}
+  <form method="post" action="/anmelden">
+    <input type="hidden" name="weiter" value="{{ weiter }}">
+    <label for="passwort">Passwort</label>
+    <input type="password" id="passwort" name="passwort" autocomplete="current-password"
+           autofocus required>
+    <button type="submit">Anmelden</button>
+  </form>
+  <p class="muted small">
+    Der Zugriff aus dem Netz ist passwortgeschützt. Die Verbindung im Heimnetz
+    läuft unverschlüsselt über HTTP &ndash; für den Weg über das Internet bitte
+    ein VPN verwenden, keine Portfreigabe im Router.
+  </p>
+</main>
+</body>
+</html>
