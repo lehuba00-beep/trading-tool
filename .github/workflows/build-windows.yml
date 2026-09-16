@@ -72,6 +72,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "zertifikat endete mit $LASTEXITCODE" }
           if ($ausgabe -notmatch "Zertifikat bereit") { throw "zertifikat ohne erwartete Ausgabe" }
 
+          # netzcheck endet absichtlich mit 1, wenn etwas fehlt - im frischen
+          # Container ist der Netzzugriff aus, also ist 1 das richtige Ergebnis.
+          $ausgabe = & dist\TradingTool\TradingTool.exe netzcheck 2>&1 | Out-String
+          Write-Host $ausgabe
+          if ($ausgabe -notmatch "Netzwerkpruefung") { throw "netzcheck ohne erwartete Ausgabe" }
+          if ($ausgabe -notmatch "Firewall") { throw "netzcheck prueft die Firewall nicht" }
+
       - name: Startversuch Oberflaeche
         # Der eigentliche Anwendungsfall. universe und rules fassen FastAPI,
         # uvicorn und die Vorlagen nicht an - die Exe koennte die

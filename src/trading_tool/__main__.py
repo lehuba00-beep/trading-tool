@@ -127,6 +127,197 @@ def command_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _powershell(befehl: str) -> str:
+    """PowerShell-Abfrage. Leerer String, wenn es nicht klappt."""
+    import subprocess
+
+    if sys.platform != "win32":
+        return ""
+    try:
+        ergebnis = subprocess.run(  # noqa: S603
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", befehl],
+            capture_output=True, text=True, timeout=20, check=False,
+        )
+        return ergebnis.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _kann_binden(port: int) -> bool:
+    """Laesst sich der Port auf allen Schnittstellen belegen?"""
+    with socket.socket() as probe:
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind(("0.0.0.0", port))  # noqa: S104
+            return True
+        except OSError:
+            return False
+
+
+def _laeuft_dort_die_anwendung(port: int, schema: str) -> bool:
+    """Antwortet auf dem Port unsere eigene Anwendung?
+
+    Ohne diese Unterscheidung waere die Pruefung praktisch nutzlos: Man ruft
+    sie ja gerade dann auf, wenn die Anwendung laeuft - und wuerde jedes Mal
+    faelschlich 'Port belegt' zu lesen bekommen.
+    """
+    import ssl
+    import urllib.error
+    import urllib.request
+
+    kontext = ssl.create_default_context()
+    kontext.check_hostname = False
+    kontext.verify_mode = ssl.CERT_NONE
+
+    try:
+        with urllib.request.urlopen(  # noqa: S310
+            f"{schema}://127.0.0.1:{port}/manifest.webmanifest",
+            timeout=4, context=kontext if schema == "https" else None,
+        ) as antwort:
+            return b"Trading-Tool" in antwort.read(4096)
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+
+
+def command_netcheck(args: argparse.Namespace) -> int:
+    """Warum ist die Anwendung vom Handy nicht erreichbar?
+
+    Geht die haeufigsten Ursachen der Reihe nach durch, statt den Nutzer
+    raten zu lassen. Die Reihenfolge entspricht der Haeufigkeit.
+    """
+    from .tls import local_addresses
+    from .ui.auth import tls_active
+
+    settings = load_settings()
+    adresse = _lan_address()
+    port = settings.ui.preferred_port() or 0
+    schema = "https" if tls_active(settings) else "http"
+    probleme: list[str] = []
+
+    print("\n  Netzwerkpruefung\n  " + "-" * 60)
+
+    # 1. Ist der Netzzugriff ueberhaupt eingeschaltet?
+    if settings.ui.allow_lan:
+        print("  [ok]      Zugriff aus dem Heimnetz ist eingeschaltet")
+    else:
+        print("  [FEHLER]  Zugriff aus dem Heimnetz ist AUS.")
+        print("            Die Anwendung hoert nur auf 127.0.0.1 - vom Handy")
+        print("            aus ist sie damit grundsaetzlich nicht erreichbar.")
+        probleme.append("TradingTool.exe passwort --netz")
+
+    # 2. Passwort
+    if settings.ui.password_hash:
+        print("  [ok]      Passwort ist gesetzt")
+    else:
+        print("  [FEHLER]  Kein Passwort gesetzt - der Start im Netz wird verweigert")
+        probleme.append("TradingTool.exe passwort --netz")
+
+    # 3. Verschluesselung
+    if tls_active(settings):
+        from .tls import paths
+
+        zertifikat = paths(settings.data_dir)
+        if zertifikat.complete:
+            print("  [ok]      Verschluesselung eingerichtet (https)")
+        else:
+            print("  [FEHLER]  Verschluesselung an, aber kein Zertifikat vorhanden")
+            probleme.append("TradingTool.exe zertifikat")
+    elif settings.ui.allow_lan:
+        print("  [Hinweis] Unverschluesselt (http) - Passwort geht offen durchs Netz")
+
+    # 4. Adresse
+    namen, alle = local_addresses()
+    print(f"  [Info]    Adresse dieses Rechners: {adresse}")
+    weitere = [a for a in alle if a not in {"127.0.0.1", "::1", adresse}]
+    if weitere:
+        print(f"            weitere Adressen: {', '.join(weitere)}")
+    print(f"  [Info]    Rechnername: {', '.join(n for n in namen if n != 'localhost')}")
+
+    if adresse.startswith("127."):
+        print("  [FEHLER]  Keine Netzwerkadresse gefunden - ist der Rechner mit")
+        print("            dem WLAN verbunden?")
+        probleme.append("WLAN-Verbindung des Rechners pruefen")
+
+    # 5. Port
+    laeuft_bereits = False
+    if port and not _kann_binden(port):
+        if _laeuft_dort_die_anwendung(port, schema):
+            laeuft_bereits = True
+            print(f"  [ok]      Port {port}: die Anwendung laeuft dort bereits")
+        else:
+            print(f"  [FEHLER]  Port {port} ist von einem anderen Programm belegt")
+            probleme.append(
+                "belegendes Programm beenden oder ui.port in settings.yaml aendern"
+            )
+    elif port:
+        print(f"  [ok]      Port {port} ist frei")
+
+    # 6. Windows: Netzwerkprofil
+    if sys.platform == "win32":
+        profil = _powershell(
+            "(Get-NetConnectionProfile | Select-Object -First 1).NetworkCategory"
+        )
+        if profil:
+            if profil.strip().lower() in {"private", "domainauthenticated"}:
+                print(f"  [ok]      Netzwerkprofil: {profil}")
+            else:
+                print(f"  [FEHLER]  Netzwerkprofil ist '{profil}'.")
+                print("            Windows blockiert eingehende Verbindungen in")
+                print("            oeffentlichen Netzen fast vollstaendig.")
+                probleme.append(
+                    "Netzwerk in den Windows-Einstellungen auf 'Privat' umstellen"
+                )
+
+        # 7. Windows: Firewall-Regel
+        regel = _powershell(
+            "Get-NetFirewallRule -DisplayName 'Trading-Tool' -ErrorAction SilentlyContinue"
+            " | Select-Object -First 1 -ExpandProperty Enabled"
+        )
+        if regel:
+            print("  [ok]      Firewall-Regel 'Trading-Tool' vorhanden")
+        else:
+            print("  [FEHLER]  Keine Firewall-Regel gefunden.")
+            print("            Die Windows-Firewall blockiert eingehende")
+            print("            Verbindungen, solange nichts freigegeben ist.")
+            probleme.append("Firewall freigeben - Befehl siehe unten")
+    else:
+        print(f"  [Info]    Firewall-Pruefung nur unter Windows ({sys.platform})")
+
+    print("  " + "-" * 60)
+
+    if not probleme:
+        print("\n  Alles in Ordnung. Auf dem Handy aufrufen:")
+        print(f"      {schema}://{adresse}:{port}")
+        if not laeuft_bereits:
+            print("\n  Die Anwendung laeuft gerade nicht - zuerst starten.")
+        print()
+        print("  Klappt es trotzdem nicht, liegt es am Netz selbst:")
+        print("    - Handy im selben WLAN? (nicht Mobilfunk, nicht Gaeste-WLAN)")
+        print("    - Manche Router trennen WLAN-Geraete voneinander")
+        print("      ('AP-Isolation' oder 'Client-Isolation' in den Routereinstellungen)\n")
+        return 0
+
+    print("\n  Zu erledigen:")
+    # Derselbe Befehl kann mehrere Befunde beheben - dann soll er einmal
+    # dastehen, nicht dreimal.
+    gesehen: set[str] = set()
+    nummer = 0
+    for schritt in probleme:
+        if schritt in gesehen:
+            continue
+        gesehen.add(schritt)
+        nummer += 1
+        print(f"    {nummer}. {schritt}")
+
+    if sys.platform == "win32" and any("Firewall" in p for p in probleme):
+        print("\n  Firewall freigeben - PowerShell ALS ADMINISTRATOR oeffnen und:")
+        print("      New-NetFirewallRule -DisplayName 'Trading-Tool' `")
+        print("        -Direction Inbound -Action Allow -Protocol TCP `")
+        print(f"        -LocalPort {port} -Profile Private")
+    print()
+    return 1
+
+
 def command_certificate(args: argparse.Namespace) -> int:
     """Zertifikat neu ausstellen und den Weg aufs Handy zeigen."""
     from .tls import ensure_certificate, local_addresses, paths
@@ -375,6 +566,11 @@ def main(argv: list[str] | None = None) -> int:
     zertifikat.add_argument("--neu", action="store_true",
                             help="Serverzertifikat neu ausstellen")
     zertifikat.set_defaults(func=command_certificate)
+
+    netzcheck = sub.add_parser(
+        "netzcheck", help="Pruefen, warum die Anwendung vom Handy nicht erreichbar ist"
+    )
+    netzcheck.set_defaults(func=command_netcheck)
 
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)

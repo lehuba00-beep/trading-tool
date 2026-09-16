@@ -85,7 +85,8 @@ Anwendung.
 | Keine Treffer in allen Profilen | Noch keine Kurse geladen - erst ein Screening laufen lassen. Die Pflichtfilter sind zudem bewusst streng. |
 | "keine Quelle" im Protokoll | Yahoo drosselt oder hat das Format geaendert. Stooq springt automatisch ein; ansonsten spaeter erneut versuchen. |
 | Zeitsteuerung feuert nicht | Die Anwendung muss laufen. Naechste Termine stehen unter Einstellungen. |
-| Firewall fragt nach | Die Anwendung bindet nur auf `127.0.0.1` und ist von aussen nicht erreichbar. Eine Freigabe ist nicht noetig. |
+| Firewall fragt nach | **Ohne Netzzugriff:** Die Anwendung bindet nur auf `127.0.0.1`, eine Freigabe ist nicht nötig. **Mit Netzzugriff:** Die Freigabe ist zwingend, sonst blockiert Windows die Verbindung vom Handy. Im Dialog „Privates Netzwerk" anhaken. |
+| „Website ist nicht erreichbar" auf dem Handy | `TradingTool.exe netzcheck` ausführen &ndash; prüft alle üblichen Ursachen der Reihe nach und nennt den nächsten Schritt. |
 
 ## Zugriff vom Smartphone
 
@@ -149,6 +150,28 @@ Android zeigt nach dem Installieren dauerhaft einen Hinweis, dass das Netzwerk
 überwacht werden könnte. Das ist der übliche Warnhinweis für jede
 nutzerinstallierte Stelle und in diesem Fall erwartbar &ndash; die Stelle liegt auf
 deinem eigenen Rechner.
+
+### 3b. Windows-Firewall freigeben
+
+Beim ersten Start mit Netzzugriff fragt Windows, ob das Programm kommunizieren
+darf. **„Privates Netzwerk" anhaken und bestätigen** &ndash; ohne die Freigabe
+blockiert Windows die Verbindung vom Handy, und im Browser steht nur
+„Die Website ist nicht erreichbar".
+
+Wurde der Dialog weggeklickt oder ist er nie erschienen, lässt sich die Regel
+nachtragen. PowerShell **als Administrator** öffnen:
+
+```powershell
+New-NetFirewallRule -DisplayName 'Trading-Tool' -Direction Inbound `
+  -Action Allow -Protocol TCP -LocalPort 8443 -Profile Private
+```
+
+Ein zweiter häufiger Fall: Windows hat das WLAN als **öffentliches Netz**
+eingestuft. Dort blockiert die Firewall eingehende Verbindungen nahezu
+vollständig. Unter *Einstellungen → Netzwerk und Internet → WLAN →
+Eigenschaften* auf **Privat** umstellen.
+
+Beides prüft `TradingTool.exe netzcheck` und sagt, was fehlt.
 
 ### 4. Auf den Startbildschirm legen
 
