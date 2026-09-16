@@ -213,3 +213,147 @@ def test_eingereihter_auftrag_nach_dem_stopp_wird_abgelehnt(settings):
     runner = JobRunner()
     runner.stop()
     assert runner.submit("x", "X", lambda progress: {}) is False
+
+
+# ----------------------------------------------------- Laufende Kurse (UI)
+
+def test_kurs_endpunkt_antwortet_ohne_isins(client):
+    antwort = client.get("/kurse")
+    assert antwort.status_code == 200
+    assert antwort.json()["kurse"] == {}
+
+
+def test_kurs_endpunkt_ohne_kursquelle_liefert_leer(client):
+    """Im Test gibt es keinen Anbieter fuer laufende Kurse - die Seite muss
+    trotzdem antworten und die Schlusskurse stehen lassen."""
+    antwort = client.get("/kurse", params={"isins": "DE0007164600,US0378331005"})
+    assert antwort.status_code == 200
+    assert antwort.json()["kurse"] == {}
+
+
+def test_kurs_endpunkt_liefert_preis_und_veraenderung(client, seeded, settings):
+    from datetime import datetime
+
+    from trading_tool.providers.quotes import Quote
+
+    class FesterDienst:
+        def get(self, instrumente):
+            return {
+                i.isin: Quote(symbol=i.ticker_yahoo, price=123.456, previous_close=120.0,
+                              fetched_at=datetime(2026, 9, 16, 14, 30))
+                for i in instrumente
+            }
+
+        def status(self):
+            return {"aktiv": True, "abgerufen": "14:30:00", "symbole": 1,
+                    "fehler": "", "intervall": 30}
+
+    client.app.state.app.quotes = FesterDienst()
+    daten = client.get("/kurse", params={"isins": "DE0007164600"}).json()
+    assert daten["kurse"]["DE0007164600"]["preis"] == pytest.approx(123.456)
+    assert daten["kurse"]["DE0007164600"]["veraenderung"] == pytest.approx(2.88, abs=0.01)
+    assert daten["abgerufen"] == "14:30:00"
+
+
+def test_unbekannte_isin_wird_ausgelassen(client):
+    antwort = client.get("/kurse", params={"isins": "DE9999999999"})
+    assert antwort.status_code == 200
+    assert antwort.json()["kurse"] == {}
+
+
+def test_trefferliste_markiert_die_kurszellen(client, seeded, settings, strategies):
+    """Ohne die Markierung findet das Skript die Zellen nicht."""
+    from trading_tool.providers.registry import ProviderChain
+    from trading_tool.screener.engine import Screener
+    from trading_tool.storage.cache import PriceCache
+
+    Screener(seeded, PriceCache(seeded, ProviderChain(settings), settings),
+             settings, strategies).run("swing", refresh=False)
+
+    text = client.get("/screener/swing").text
+    assert 'data-kurs="' in text
+    assert "kurs-wert" in text
+
+
+def test_seite_traegt_das_abfrageintervall(client):
+    assert 'data-kurs-intervall="30"' in client.get("/").text
+
+
+def test_abgeschaltete_kurse_setzen_das_intervall_auf_null(seeded, settings):
+    settings.schedule.enabled = False
+    settings.quotes.enabled = False
+    app = create_app(settings)
+    with TestClient(app) as c:
+        assert 'data-kurs-intervall="0"' in c.get("/").text
+
+
+# --------------------------------------------------------- Datenqualitaet
+
+def test_datenqualitaet_ist_erreichbar(client):
+    antwort = client.get("/datenqualitaet")
+    assert antwort.status_code == 200
+    assert "Datenqualität" in antwort.text
+
+
+def test_datenqualitaet_erklaert_die_pruefungen(client):
+    text = client.get("/datenqualitaet").text
+    for begriff in ["Veraltet", "Kurssprünge", "Widersprüchliche", "Eingefrorene"]:
+        assert begriff in text
+
+
+def test_datenqualitaet_meldet_titel_ohne_kursdaten(client, seeded):
+    """Die meisten Titel aus der mitgelieferten Liste haben im Test keine
+    Kursreihe - genau das soll die Seite zeigen."""
+    text = client.get("/datenqualitaet").text
+    assert "keine Kursdaten" in text
+
+
+def test_datenqualitaet_kann_alle_titel_zeigen(client):
+    assert client.get("/datenqualitaet", params={"nur_probleme": 0}).status_code == 200
+
+
+def test_navigation_verlinkt_die_datenqualitaet(client):
+    assert 'href="/datenqualitaet"' in client.get("/").text
+
+
+# ------------------------------------------------- Stop und Ziel im Chart
+
+def test_chart_zeigt_stop_und_ziel_bei_gewaehlter_strategie(client):
+    text = client.get("/instrument/DE0007164600", params={"strategie": "swing"}).text
+    assert 'class="level stop"' in text
+    assert 'class="level ziel"' in text
+    assert 'class="level einstieg"' in text
+    assert "Stop " in text and "Ziel " in text
+
+
+def test_chart_ohne_strategie_zeigt_keine_marken(client):
+    """Ohne Strategie gibt es keinen ATR-Stop - dann auch keine Linie."""
+    text = client.get("/instrument/DE0007164600").text
+    assert 'class="level stop"' not in text
+
+
+def test_marken_passen_zur_risikovorgabe_der_strategie(client, strategies):
+    text = client.get("/instrument/DE0007164600", params={"strategie": "swing"}).text
+    faktor = strategies["swing"].risk.stop_atr_factor
+    assert f"{faktor:.1f}".replace(".", ",") in text
+
+
+def test_laufender_kurs_ist_als_solcher_beschriftet(client, seeded, settings, strategies):
+    """Stop und Ziel stammen aus dem Lauf, der Kurs daneben ist laufend -
+    ohne Beschriftung liest man zwei Zahlen aus verschiedenen Zeitpunkten
+    nebeneinander wie eine."""
+    from trading_tool.providers.registry import ProviderChain
+    from trading_tool.screener.engine import Screener
+    from trading_tool.storage.cache import PriceCache
+
+    Screener(seeded, PriceCache(seeded, ProviderChain(settings), settings),
+             settings, strategies).run("swing", refresh=False)
+
+    text = client.get("/screener/swing").text
+    assert "laufend" in text
+    assert "nicht laufend angepasst" in text
+
+
+def test_instrumentenseite_trennt_laufenden_kurs_von_kennzahlen(client):
+    text = client.get("/instrument/DE0007164600", params={"strategie": "swing"}).text
+    assert "Nur der Kurs wird laufend aktualisiert" in text

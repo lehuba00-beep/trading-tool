@@ -37,3 +37,84 @@
     });
   });
 })();
+
+/* Laufend aktualisierte Kurse.
+
+   Keine Echtzeitkurse - die Quelle liefert verzoegert. Deshalb wird neben dem
+   Kurs immer der Abrufzeitpunkt angezeigt; ein Kurs ohne Zeitstempel waere
+   eine stille Behauptung von Aktualitaet. */
+(function () {
+  "use strict";
+
+  function zellen() {
+    return Array.prototype.slice.call(document.querySelectorAll("[data-kurs]"));
+  }
+
+  function formatiere(zahl, stellen) {
+    return zahl.toLocaleString("de-DE", {
+      minimumFractionDigits: stellen,
+      maximumFractionDigits: stellen,
+    });
+  }
+
+  function schreibe(zelle, eintrag) {
+    var wert = zelle.querySelector(".kurs-wert");
+    if (wert) wert.textContent = formatiere(eintrag.preis, 2);
+
+    var delta = zelle.querySelector(".kurs-delta");
+    if (!delta) return;
+    if (eintrag.veraenderung === null || eintrag.veraenderung === undefined) {
+      delta.textContent = "";
+      return;
+    }
+    var vorzeichen = eintrag.veraenderung > 0 ? "+" : "";
+    delta.textContent = vorzeichen + formatiere(eintrag.veraenderung, 2) + " %";
+    delta.className = "kurs-delta " + (eintrag.veraenderung >= 0 ? "pos" : "neg");
+  }
+
+  function aktualisiereStand(daten) {
+    var anzeige = document.getElementById("kurs-stand");
+    if (!anzeige) return;
+    if (daten.fehler) {
+      anzeige.textContent = "Kurse nicht abrufbar - angezeigt sind Schlusskurse";
+      anzeige.className = "kurs-stand fehler";
+      return;
+    }
+    if (!daten.abgerufen) return;
+    anzeige.textContent = "Kurse abgerufen " + daten.abgerufen + " · verzögert";
+    anzeige.className = "kurs-stand";
+  }
+
+  function hole() {
+    var liste = zellen();
+    if (!liste.length) return;
+
+    var isins = liste.map(function (zelle) {
+      return zelle.getAttribute("data-kurs");
+    });
+
+    fetch("/kurse?isins=" + encodeURIComponent(isins.join(",")))
+      .then(function (antwort) {
+        return antwort.ok ? antwort.json() : null;
+      })
+      .then(function (daten) {
+        if (!daten) return;
+        liste.forEach(function (zelle) {
+          var eintrag = daten.kurse[zelle.getAttribute("data-kurs")];
+          if (eintrag) schreibe(zelle, eintrag);
+        });
+        aktualisiereStand(daten);
+      })
+      .catch(function () {
+        /* Ein fehlgeschlagener Abruf laesst die Schlusskurse stehen. */
+      });
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    if (!zellen().length) return;
+    var intervall = parseInt(document.body.getAttribute("data-kurs-intervall"), 10);
+    if (!intervall || intervall < 5) return;
+    hole();
+    setInterval(hole, intervall * 1000);
+  });
+})();

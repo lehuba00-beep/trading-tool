@@ -16,6 +16,7 @@ import pandas as pd
 
 from ..config import Settings
 from ..domain.models import Instrument, Signal
+from ..quality import QualityReport, Severity, check_series
 from ..storage.cache import PriceCache
 from ..storage.repositories import InstrumentRepo, RunRepo, SignalRepo, WatchlistRepo
 from ..strategies.base import Strategy, StrategyEvaluation
@@ -74,6 +75,40 @@ class Screener:
             except Exception as exc:  # ein kaputtes Symbol darf den Lauf nicht kippen
                 log.warning("Kursabruf %s fehlgeschlagen: %s", instrument.isin, exc)
 
+    def refresh_earnings(self, progress: Progress | None = None) -> int:
+        """Termine fuer Quartalszahlen nachtragen.
+
+        Bewusst auf wenige Titel je Lauf begrenzt: Jeder Termin ist ein
+        eigener Abruf, und die Quelle drosselt. Ueber mehrere Laeufe ist die
+        Liste trotzdem schnell vollstaendig.
+        """
+        if not self.settings.earnings.enabled:
+            return 0
+        provider = next(
+            (p for p in self.cache.chain.providers if hasattr(p, "fetch_earnings_date")),
+            None,
+        )
+        if provider is None:
+            return 0
+
+        offen = self.instruments.needs_earnings_refresh(
+            self.settings.earnings.max_age_days, self.settings.earnings.per_run
+        )
+        gefunden = 0
+        for nummer, instrument in enumerate(offen, start=1):
+            if progress:
+                progress(nummer, len(offen), f"Termine {instrument.name}")
+            try:
+                termin = provider.fetch_earnings_date(instrument.ticker_yahoo)
+            except Exception as exc:
+                log.debug("Termin %s: %s", instrument.isin, exc)
+                continue
+            # Auch ein leeres Ergebnis wird vermerkt, sonst fragt jeder Lauf
+            # erneut nach Titeln, fuer die die Quelle nichts hat.
+            self.instruments.set_earnings(instrument.isin, termin)
+            gefunden += termin is not None
+        return gefunden
+
     def run(
         self,
         strategy_name: str,
@@ -91,11 +126,13 @@ class Screener:
         try:
             if refresh:
                 self.refresh_prices(instruments, strategy, progress)
+                self.refresh_earnings(progress)
 
             benchmark = self._benchmark_series(strategy)
             results: list[Signal] = []
             skipped_history = 0
             skipped_liquidity = 0
+            beanstandet = 0
 
             for number, instrument in enumerate(instruments, start=1):
                 if progress:
@@ -105,6 +142,10 @@ class Screener:
                 if len(frame) < strategy.universe.min_history_days:
                     skipped_history += 1
                     continue
+
+                bericht = check_series(frame, instrument.isin)
+                if bericht.severity is not Severity.OK:
+                    beanstandet += 1
 
                 ctx = IndicatorContext(frame, benchmark)
 
@@ -119,14 +160,17 @@ class Screener:
                 evaluation = strategy.evaluate(ctx)
                 if not bool(evaluation.eligible.iloc[-1]):
                     continue
-                results.append(self._build_signal(instrument, strategy, ctx, evaluation))
+                results.append(
+                    self._build_signal(instrument, strategy, ctx, evaluation, bericht)
+                )
 
             results.sort(key=lambda s: s.score, reverse=True)
             self.signals.save_many(run_id, results)
             self.runs.finish(
                 run_id, len(instruments), len(results), "ok",
                 f"uebersprungen: {skipped_history} ohne Historie, "
-                f"{skipped_liquidity} zu illiquide",
+                f"{skipped_liquidity} zu illiquide; "
+                f"{beanstandet} mit Datenauffaelligkeiten",
             )
             return run_id, results
 
@@ -162,6 +206,7 @@ class Screener:
         strategy: Strategy,
         ctx: IndicatorContext,
         evaluation: StrategyEvaluation,
+        quality: QualityReport | None = None,
     ) -> Signal:
         last = ctx.index[-1].date()
         close = float(ctx.close.iloc[-1])
@@ -202,6 +247,12 @@ class Screener:
             # abgeschlossen. Ein darauf beruhendes Signal kann sich bis
             # Handelsschluss wieder aufloesen - das muss sichtbar bleiben.
             provisional=last >= date.today(),
+            # Ein Titel mit Datenproblem wird markiert, nicht aussortiert:
+            # Stilles Weglassen wuerde genau die Information verbergen, um
+            # derentwillen geprueft wird.
+            quality=str(quality.severity) if quality else "ok",
+            quality_notes=[f.message for f in quality.findings] if quality else [],
+            earnings_date=instrument.next_earnings,
         )
 
 

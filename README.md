@@ -17,6 +17,11 @@ Hebelprodukte.
 * Leitet für Hebelprodukte den maximal sinnvollen Hebel und den
   Mindestabstand der Knock-Out-Schwelle aus der Volatilität ab – ohne einen
   einzigen Zertifikatskurs abzurufen.
+* Zeichnet Einstieg, ATR-Stop und Zielzone direkt in den Chart.
+* Prüft die Kursreihen auf Datenfehler: veraltete Reihen, fehlerhafte
+  Einzelkurse, widersprüchliche Balken.
+* Warnt, wenn Quartalszahlen in die geplante Haltedauer fallen.
+* Aktualisiert die angezeigten Kurse laufend (verzögert, mit Zeitstempel).
 * Läuft dreimal täglich automatisch: 09:30, 14:00, 22:30.
 
 ## Schnellstart
@@ -94,6 +99,12 @@ ruff check src tests
   mit genügend Parametervarianten sieht jede Regel irgendwann gut aus.
 * **Keine Zertifikatskurse.** Für Hebelprodukte liefert das Werkzeug Mathematik
   und Hinweise, keine Produktdaten.
+* **Keine Echtzeitkurse.** Die laufende Aktualisierung zeigt den aktuellsten
+  *verfügbaren* Kurs — je nach Börse 15 bis 20 Minuten verzögert. Echte
+  Realtime-Daten setzen einen lizenzierten, kostenpflichtigen Feed voraus.
+  Abrufzeitpunkt und Verzögerung stehen in der Oberfläche.
+* **Quartalstermine sind lückenhaft.** Für ETFs und Indizes gibt es keine, für
+  manche Nebenwerte auch nicht. Ein Hinweis, keine Zusicherung.
 
 ## Rechtlicher Hinweis
 

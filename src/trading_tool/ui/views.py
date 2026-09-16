@@ -6,10 +6,11 @@ import logging
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 
 from ..derivatives import GENERAL_RISKS, leverage_hint, products_for, tr_search_hint
 from ..domain.enums import Direction, TRStatus
+from ..quality import Severity, check_series
 from ..reporting import to_csv, to_xlsx
 from ..screener.ranking import sort_signals
 from ..strategies.context import IndicatorContext
@@ -30,6 +31,7 @@ def _render(request: Request, template: str, **context) -> HTMLResponse:
     state = _state(request)
     context.setdefault("strategies", state.active_strategies())
     context.setdefault("job", state.jobs.state)
+    context.setdefault("kurs_status", state.quotes.status())
     context.setdefault("request", request)
     return _templates(request).TemplateResponse(request, template, context)
 
@@ -103,6 +105,77 @@ def job_status(request: Request):
     return _render(request, "_job.html", job=state.jobs.state, pending=state.jobs.pending)
 
 
+# ------------------------------------------------------------------ Kurse
+
+@router.get("/kurse")
+def kurse(request: Request, isins: str = ""):
+    """Laufend aktualisierte Kurse als JSON.
+
+    Ausdruecklich keine Echtzeitkurse - Yahoo liefert je nach Boerse 15 bis 20
+    Minuten verzoegert. Der Abrufzeitpunkt wird mitgeliefert und in der
+    Oberflaeche angezeigt, damit niemand die Verzoegerung uebersieht.
+    """
+    state = _state(request)
+    gewuenscht = [i.strip() for i in isins.split(",") if i.strip()]
+    if not gewuenscht:
+        return JSONResponse({"kurse": {}, **state.quotes.status()})
+
+    instrumente = [
+        instrument
+        for instrument in (state.instruments.get(isin) for isin in gewuenscht)
+        if instrument is not None
+    ]
+    quotes = state.quotes.get(instrumente)
+
+    return JSONResponse(
+        {
+            "kurse": {
+                isin: {
+                    "preis": round(q.price, 4),
+                    "veraenderung": round(q.change_pct, 2) if q.change_pct is not None else None,
+                }
+                for isin, q in quotes.items()
+            },
+            **state.quotes.status(),
+        }
+    )
+
+
+# ------------------------------------------------------------ Datenqualitaet
+
+@router.get("/datenqualitaet", response_class=HTMLResponse)
+def datenqualitaet(request: Request, nur_probleme: int = 1):
+    """Kursreihen auf Auffaelligkeiten pruefen.
+
+    Ein fehlerhafter Einzelkurs erzeugt ein makelloses Ausbruchssignal, und
+    eine stehengebliebene Reihe laesst alle Indikatoren weiterrechnen - nur
+    eben auf altem Stand. Beides ist ohne Pruefung nicht zu sehen.
+    """
+    state = _state(request)
+    instrumente = state.instruments.screenable(
+        ["verified", "assumed"], ["stock", "etf"]
+    )
+
+    berichte = []
+    for instrument in instrumente:
+        frame = state.cache.bars_in_base_currency(instrument)
+        bericht = check_series(frame, instrument.isin)
+        if nur_probleme and bericht.ok:
+            continue
+        berichte.append((instrument, bericht))
+
+    berichte.sort(key=lambda paar: (-paar[1].severity.rank, paar[0].name))
+    zaehler = {
+        "gesamt": len(instrumente),
+        "warnung": sum(1 for _, b in berichte if b.severity is Severity.WARNUNG),
+        "hinweis": sum(1 for _, b in berichte if b.severity is Severity.HINWEIS),
+    }
+    return _render(
+        request, "quality.html",
+        berichte=berichte, zaehler=zaehler, nur_probleme=nur_probleme,
+    )
+
+
 # -------------------------------------------------------------- Instrument
 
 @router.get("/instrument/{isin}", response_class=HTMLResponse)
@@ -122,14 +195,26 @@ def instrument_detail(request: Request, isin: str, strategie: str = ""):
     metrics: dict = {}
     strategy = state.strategies.get(strategie)
 
+    bericht = check_series(frame, instrument.isin)
+
     if not frame.empty:
         ctx = IndicatorContext(frame, state.screener._benchmark_series(strategy) if strategy else None)
         overlays = {"EMA 20": ctx.ma("ema", 20), "SMA 50": ctx.ma("sma", 50)}
         if len(frame) > 200:
             overlays["SMA 200"] = ctx.ma("sma", 200)
-        chart = candlestick(frame, overlays, title=instrument.name)
 
         close = float(ctx.close.iloc[-1])
+        marken: list[tuple[str, float, str]] = []
+        if strategy is not None:
+            atr = float(ctx.atr(strategy.risk.atr_period).iloc[-1])
+            stop_kurs = close - strategy.risk.stop_atr_factor * atr
+            ziel_kurs = close + strategy.risk.target_atr_factor * atr
+            marken = [
+                (f"Einstieg {close:,.2f}".replace(",", "."), close, "einstieg"),
+                (f"Stop {stop_kurs:,.2f}".replace(",", "."), stop_kurs, "stop"),
+                (f"Ziel {ziel_kurs:,.2f}".replace(",", "."), ziel_kurs, "ziel"),
+            ]
+        chart = candlestick(frame, overlays, title=instrument.name, levels=marken)
         metrics = {
             "Kurs (EUR)": round(close, 2),
             "RSI(14)": _fmt(ctx.rsi(14).iloc[-1]),
@@ -147,9 +232,7 @@ def instrument_detail(request: Request, isin: str, strategie: str = ""):
 
         if strategy is not None:
             evaluation = strategy.evaluate(ctx)
-            atr = float(ctx.atr(strategy.risk.atr_period).iloc[-1])
-            stop = close - strategy.risk.stop_atr_factor * atr
-            hint = leverage_hint(close, stop, Direction(strategy.direction))
+            hint = leverage_hint(close, stop_kurs, Direction(strategy.direction))
             adx_value = ctx.adx(14).iloc[-1]
             products = products_for(strategy.horizon, float(adx_value) if adx_value == adx_value else None)
 
@@ -158,7 +241,13 @@ def instrument_detail(request: Request, isin: str, strategie: str = ""):
         instrument=instrument, chart=chart, metrics=metrics, frame_len=len(frame),
         strategy=strategy, strategie=strategie, evaluation=evaluation,
         hits=evaluation.hits_at(-1) if evaluation else [],
-        hint=hint, products=products, risks=GENERAL_RISKS,
+        hint=hint, products=products, risks=GENERAL_RISKS, bericht=bericht,
+        zahlen_in_tagen=instrument.earnings_in_days(),
+        zahlen_kritisch=(
+            strategy is not None
+            and instrument.earnings_in_days() is not None
+            and 0 <= instrument.earnings_in_days() <= strategy.risk.max_holding_days * 1.5
+        ),
         tr_hint=tr_search_hint(instrument.isin, instrument.name),
         issuers=state.issuers, watched=instrument.isin in set(state.watchlist.isins()),
     )

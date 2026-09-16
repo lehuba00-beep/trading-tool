@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Datenqualität{% endblock %}
+{% block content %}
+<h1>Datenqualität</h1>
+<p class="muted">
+  Ein fehlerhafter Einzelkurs erzeugt ein makelloses Ausbruchssignal, und eine
+  stehengebliebene Kursreihe lässt alle Indikatoren weiterrechnen &ndash; nur
+  eben auf altem Stand. Beides sieht man dem Signal nicht an. Hier steht, was
+  auffällig ist.
+</p>
+
+<div class="toolbar">
+  <span class="muted">
+    {{ zaehler.gesamt }} Titel geprüft &middot;
+    <strong class="neg">{{ zaehler.warnung }}</strong> mit Warnung &middot;
+    <strong>{{ zaehler.hinweis }}</strong> mit Hinweis
+  </span>
+  <a class="btn secondary" href="/datenqualitaet?nur_probleme={{ 0 if nur_probleme else 1 }}">
+    {{ 'Alle Titel zeigen' if nur_probleme else 'Nur Auffälligkeiten' }}</a>
+</div>
+
+{% if berichte %}
+<table class="grid">
+  <thead><tr><th>Titel</th><th>Befund</th><th>Bedeutung</th>
+    <th>Balken</th><th>letzter Kurs</th></tr></thead>
+  <tbody>
+  {% for instrument, bericht in berichte %}
+    <tr>
+      <td><a href="/instrument/{{ instrument.isin }}">{{ instrument.name }}</a>
+        <br><span class="muted small">{{ instrument.ticker_yahoo }}</span></td>
+      <td>
+        {% if bericht.ok %}<span class="tag hit">in Ordnung</span>{% endif %}
+        {% for f in bericht.findings %}
+          <span class="tag {{ f.severity.value }}">{{ f.message }}</span>
+        {% endfor %}
+      </td>
+      <td class="muted small">
+        {% for f in bericht.findings %}<div>{{ f.detail }}</div>{% endfor %}
+      </td>
+      <td class="num">{{ bericht.bars }}</td>
+      <td class="muted small">{{ bericht.last_bar.strftime('%d.%m.%Y') if bericht.last_bar else '-' }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Keine Auffälligkeiten &ndash; alle geprüften Kursreihen sind
+vollständig, aktuell und ohne verdächtige Sprünge.</p>
+{% endif %}
+
+<section class="card wide">
+  <h2>Worauf geprüft wird</h2>
+  <ul class="notes">
+    <li><strong>Veraltet</strong> &ndash; die Reihe endet vor mehr als fünf Handelstagen.
+      Ein Signal darauf beschreibt die Vergangenheit.</li>
+    <li><strong>Verdächtige Kurssprünge</strong> &ndash; ein Sprung, der am Folgetag
+      wieder auf das Ausgangsniveau zurückkehrt. Ein echter Kurssprung bleibt;
+      ein Datenfehler verschwindet.</li>
+    <li><strong>Widersprüchliche Balken</strong> &ndash; Hoch unter Tief oder Schluss
+      außerhalb der Tagesspanne. Solche Balken verfälschen ATR und Ausbruchsregeln.</li>
+    <li><strong>Eingefrorene Reihe</strong> &ndash; zehn Tage oder mehr ohne
+      Kursänderung. Meist liefert die Quelle einen festgehaltenen Kurs.</li>
+    <li><strong>Lücken</strong> &ndash; deutlich weniger Balken als Handelstage im
+      Zeitraum. Feiertage erklären einen Teil davon, nicht alles.</li>
+    <li><strong>Fehlendes Volumen</strong> &ndash; Regeln zum relativen Volumen und
+      der Liquiditätsfilter greifen dann nicht zuverlässig.</li>
+  </ul>
+  <p class="muted small">
+    Titel mit Befund werden <strong>markiert, nicht aussortiert</strong>. Stilles
+    Weglassen würde genau die Information verbergen, um derentwillen geprüft wird.
+  </p>
+</section>
+{% endblock %}

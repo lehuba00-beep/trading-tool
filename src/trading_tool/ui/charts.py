@@ -29,8 +29,14 @@ def candlestick(
     overlays: dict[str, pd.Series] | None = None,
     bars: int = 140,
     title: str = "",
+    levels: list[tuple[str, float, str]] | None = None,
 ) -> str:
-    """Kerzenchart mit Volumen und optionalen Linien-Overlays."""
+    """Kerzenchart mit Volumen, Linien-Overlays und waagerechten Marken.
+
+    ``levels`` sind Marken wie Stop und Ziel als (Beschriftung, Kurs, Stilklasse).
+    Sie gehen in die Skalierung ein - ein Stop unterhalb des sichtbaren
+    Bereichs waere eine Marke, die man gerade dann nicht sieht, wenn sie zaehlt.
+    """
     if frame is None or frame.empty:
         return '<p class="muted">Keine Kursdaten vorhanden.</p>'
 
@@ -39,8 +45,12 @@ def candlestick(
         name: series.reindex(data.index) for name, series in (overlays or {}).items()
     }
 
+    levels = [lv for lv in (levels or []) if lv[1] is not None and pd.notna(lv[1])]
+
     highs = [data["high"].max()] + [s.max() for s in overlays.values() if s.notna().any()]
     lows = [data["low"].min()] + [s.min() for s in overlays.values() if s.notna().any()]
+    highs += [float(lv[1]) for lv in levels]
+    lows += [float(lv[1]) for lv in levels]
     high = float(max(v for v in highs if pd.notna(v)))
     low = float(min(v for v in lows if pd.notna(v)))
     span = (high - low) or 1.0
@@ -101,6 +111,18 @@ def candlestick(
                 f'<rect class="vol {css}" x="{x - body / 2:.1f}" '
                 f'y="{volume_bottom - vh:.1f}" width="{body:.1f}" height="{vh:.1f}"/>'
             )
+
+    for beschriftung, wert, stil in levels:
+        y = _scale(float(wert), low, high, price_top, price_bottom)
+        breite = 8 + len(beschriftung) * 6.5
+        parts.append(
+            f'<line class="level {stil}" x1="{PADDING_LEFT}" y1="{y:.1f}" '
+            f'x2="{WIDTH - PADDING_RIGHT}" y2="{y:.1f}"/>'
+            f'<rect class="level-tag {stil}" x="{PADDING_LEFT + 2}" '
+            f'y="{y - 8:.1f}" width="{breite:.0f}" height="16" rx="3"/>'
+            f'<text class="level-text" x="{PADDING_LEFT + 6}" y="{y + 4:.1f}">'
+            f"{beschriftung}</text>"
+        )
 
     for number, series in enumerate(overlays.values(), start=1):
         points = [

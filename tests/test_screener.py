@@ -206,3 +206,82 @@ def test_sortierung_nutzt_liquiditaet_als_zweitkriterium():
                metrics={"umsatz_20d_eur": 9_000_000}),
     ]
     assert [s.isin for s in sort_signals(gleich)] == ["B", "A"]
+
+
+# ------------------------------------- Datenqualitaet und Termine am Signal
+
+def test_signal_traegt_den_qualitaetsbefund(seeded, settings, strategies):
+    """Ein Titel mit Datenproblem wird markiert, nicht aussortiert - sonst
+    verschwindet genau die Information, um derentwillen geprueft wird."""
+    from trading_tool.storage.repositories import BarRepo
+
+    frame = trending_series(seed=1)
+    # Auf denselben aktuellen Zeitraum legen wie die Fixture, sonst kaeme der
+    # Befund nur daher, dass die Reihe alt ist.
+    frame.index = pd.bdate_range(
+        end=pd.Timestamp(date.today()) - pd.offsets.BDay(1), periods=len(frame)
+    )
+    # Eingefrorene Reihe am Ende: sichtbarer Befund, aber weiter handelbar
+    letzte = frame.index[-15:]
+    wert = float(frame.loc[letzte[0], "close"])
+    for spalte in ("open", "high", "low", "close", "adj_close"):
+        frame.loc[letzte, spalte] = wert
+    BarRepo(seeded).upsert("DE0007164600", "yfinance", frame)
+
+    screener = _screener(seeded, settings, strategies)
+    _, signals = screener.run("mittelfristig", refresh=False)
+    betroffen = [s for s in signals if s.isin == "DE0007164600"]
+    if betroffen:
+        assert betroffen[0].quality != "ok"
+        assert betroffen[0].quality_notes
+
+
+def test_saubere_reihe_ergibt_signal_ohne_befund(seeded, settings, strategies):
+    _, signals = _screener(seeded, settings, strategies).run("swing", refresh=False)
+    assert signals, "die Testreihen sollten Treffer liefern"
+    assert all(s.quality == "ok" for s in signals)
+    assert all(s.quality_notes == [] for s in signals)
+
+
+def test_lauf_nennt_die_zahl_der_auffaelligkeiten(seeded, settings, strategies):
+    screener = _screener(seeded, settings, strategies)
+    screener.run("swing", refresh=False)
+    assert "Datenauffaelligkeiten" in screener.runs.latest("swing").message
+
+
+def test_termin_wandert_an_das_signal(seeded, settings, strategies):
+    from datetime import timedelta
+
+    from trading_tool.storage.repositories import InstrumentRepo
+
+    termin = date.today() + timedelta(days=4)
+    InstrumentRepo(seeded).set_earnings("DE0007164600", termin)
+
+    _, signals = _screener(seeded, settings, strategies).run("swing", refresh=False)
+    betroffen = [s for s in signals if s.isin == "DE0007164600"]
+    if betroffen:
+        assert betroffen[0].earnings_date == termin
+        assert betroffen[0].earnings_within_holding(20)
+
+
+def test_qualitaet_und_termin_ueberleben_das_speichern(seeded, settings, strategies):
+    """Die Trefferliste wird aus der Datenbank gelesen, nicht aus dem Speicher."""
+    from datetime import timedelta
+
+    from trading_tool.storage.repositories import InstrumentRepo
+
+    InstrumentRepo(seeded).set_earnings("DE0007164600", date.today() + timedelta(days=4))
+    screener = _screener(seeded, settings, strategies)
+    run_id, _ = screener.run("swing", refresh=False)
+
+    gelesen = screener.signals.for_run(run_id)
+    assert gelesen, "es sollten Treffer gespeichert worden sein"
+    assert all(hasattr(s, "quality") for s in gelesen)
+    betroffen = [s for s in gelesen if s.isin == "DE0007164600"]
+    if betroffen:
+        assert betroffen[0].earnings_date is not None
+
+
+def test_termine_ohne_passenden_anbieter_stoeren_nicht(seeded, settings, strategies):
+    """Der CSV-Provider kennt keine Termine - das darf den Lauf nicht kippen."""
+    assert _screener(seeded, settings, strategies).refresh_earnings() == 0

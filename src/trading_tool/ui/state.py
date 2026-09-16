@@ -12,6 +12,7 @@ from pathlib import Path
 from ..backtest import evaluate_strategy
 from ..config import Settings, bundle_dir
 from ..derivatives import load_issuers
+from ..providers.quotes import QuoteService
 from ..providers.registry import ProviderChain
 from ..screener.engine import Screener
 from ..storage.cache import PriceCache
@@ -37,6 +38,7 @@ class AppState:
         self.conn = init_db(settings.db_path)
         self.chain = ProviderChain(settings)
         self.cache = PriceCache(self.conn, self.chain, settings)
+        self.quotes = QuoteService(self.chain, self.cache, settings)
         self.strategies = load_all(settings.strategy_dir)
         self.screener = Screener(self.conn, self.cache, settings, self.strategies)
         self.instruments = InstrumentRepo(self.conn)

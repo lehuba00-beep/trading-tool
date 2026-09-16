@@ -35,22 +35,71 @@
   </form>
 </div>
 
+{% if not bericht.ok %}
+<div class="banner warn">
+  <strong>Datenqualität:</strong>
+  {% for f in bericht.findings %}
+    <span class="tag {{ f.severity.value }}">{{ f.message }}</span>
+  {% endfor %}
+  <div class="muted small" style="margin-top:6px">
+    {% for f in bericht.findings %}{{ f.detail }} {% endfor %}
+    Ein Signal auf einer solchen Reihe ist mit Vorsicht zu lesen &ndash;
+    Details unter <a href="/datenqualitaet">Datenqualität</a>.
+  </div>
+</div>
+{% endif %}
+
+{% if zahlen_in_tagen is not none and zahlen_in_tagen >= 0 %}
+<div class="banner {{ 'warn' if zahlen_kritisch }}">
+  <strong>Quartalszahlen in {{ zahlen_in_tagen }} Tagen</strong>
+  ({{ instrument.next_earnings.strftime('%d.%m.%Y') }}).
+  {% if zahlen_kritisch %}
+    Der Termin fällt in die geplante Haltedauer dieser Strategie. Das Regelwerk
+    kennt keine Termine &ndash; ein Signal kurz vor Zahlen ist ein Münzwurf, den
+    die Indikatoren nicht erkennen können.
+  {% endif %}
+  <span class="muted small">Termin laut Datenquelle, ohne Gewähr.</span>
+</div>
+{% endif %}
+
 <div class="banner">
   <strong>Handelbarkeit pruefen:</strong> {{ tr_hint.hinweis }}
   <code class="copy">{{ tr_hint.isin }}</code>
 </div>
 
 {{ chart|safe }}
-<p class="muted small">{{ frame_len }} Tagesbalken im Cache. Kurse in EUR.</p>
+<p class="muted small">
+  {{ frame_len }} Tagesbalken im Cache. Kurse in EUR.
+  {% if strategy %}
+    Im Chart eingezeichnet: Einstieg, ATR-Stop ({{ strategy.risk.stop_atr_factor|zahl(1) }}&times; ATR)
+    und Zielzone ({{ strategy.risk.target_atr_factor|zahl(1) }}&times; ATR).
+  {% endif %}
+  {% if kurs_status.aktiv %}<span id="kurs-stand" class="kurs-stand">Kurse werden geladen …</span>{% endif %}
+</p>
 
 <div class="split">
   <section class="card">
     <h2>Kennzahlen</h2>
     <table class="kv">
       {% for key, value in metrics.items() %}
-      <tr><th>{{ key }}</th><td class="num">{{ value|zahl }}</td></tr>
+      <tr><th>{{ key }}</th>
+        {% if loop.first %}
+          <td class="num" data-kurs="{{ instrument.isin }}"
+              title="Laufend aktualisiert, verzögert. Die übrigen Kennzahlen stammen vom letzten Schlusskurs.">
+            <span class="kurs-wert">{{ value|zahl }}</span>
+            <span class="kurs-delta"></span>
+          </td>
+        {% else %}
+          <td class="num">{{ value|zahl }}</td>
+        {% endif %}
+      </tr>
       {% endfor %}
     </table>
+    <p class="muted small">
+      Nur der Kurs wird laufend aktualisiert. Alle übrigen Kennzahlen &ndash;
+      und damit auch Stop und Ziel im Chart &ndash; beruhen auf dem letzten
+      abgeschlossenen Tagesbalken.
+    </p>
   </section>
 
   {% if strategy %}

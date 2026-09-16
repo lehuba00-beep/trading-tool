@@ -21,6 +21,15 @@ class Instrument:
     tr_checked_at: date | None = None
     source: str = ""
     notes: str = ""
+    next_earnings: date | None = None
+    """Naechster Termin fuer Quartalszahlen, soweit die Quelle ihn kennt."""
+    earnings_checked_at: date | None = None
+
+    def earnings_in_days(self, today: date | None = None) -> int | None:
+        """Kalendertage bis zu den naechsten Zahlen. None, wenn unbekannt."""
+        if self.next_earnings is None:
+            return None
+        return (self.next_earnings - (today or date.today())).days
 
     @property
     def screenable(self) -> bool:
@@ -55,6 +64,27 @@ class Signal:
     tr_status: TRStatus = TRStatus.UNKNOWN
     provisional: bool = False
     """True, wenn der letzte Balken noch nicht abgeschlossen ist."""
+    quality: str = "ok"
+    """Befund der Datenqualitaetspruefung: ok, hinweis oder warnung."""
+    quality_notes: list[str] = field(default_factory=list)
+    earnings_date: date | None = None
+    """Naechster Termin fuer Quartalszahlen, soweit bekannt."""
+
+    def earnings_in_days(self, today: date | None = None) -> int | None:
+        if self.earnings_date is None:
+            return None
+        return (self.earnings_date - (today or date.today())).days
+
+    def earnings_within_holding(self, holding_days: int, today: date | None = None) -> bool:
+        """Fallen die Zahlen in die geplante Haltedauer?
+
+        Das ist der Fall, der zaehlt: Ein Ausbruchssignal zwei Tage vor Zahlen
+        ist ein Muenzwurf, den die Regeln nicht erkennen koennen.
+        """
+        tage = self.earnings_in_days(today)
+        # Handelstage sind knapp die Haelfte der Kalendertage - grosszuegig
+        # gerechnet, damit der Hinweis eher zu frueh als zu spaet kommt.
+        return tage is not None and 0 <= tage <= holding_days * 1.5
 
     @property
     def triggered_labels(self) -> list[str]:

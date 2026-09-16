@@ -31,24 +31,44 @@ def make_series(
     """OHLCV-Reihe mit vorgegebenem Trend und Rauschen."""
     rng = np.random.default_rng(seed)
     returns = rng.normal(drift, vol, n)
-    close = pd.Series(price * np.cumprod(1 + returns), index=pd.date_range(start, periods=n, freq="B"))
+    index = pd.date_range(start, periods=n, freq="B")
+    close = pd.Series(price * np.cumprod(1 + returns), index=index)
+
+    # Hoch und Tief werden aus Eroeffnung und Schluss abgeleitet, damit beide
+    # innerhalb der Tagesspanne liegen. Bei echten Kursdaten ist das per
+    # Definition so - eine Fixture, die das verletzt, laesst die
+    # Datenqualitaetspruefung zu Recht Alarm schlagen.
+    open_ = (close.shift(1) * (1 + rng.normal(0, vol / 4, n))).bfill()
     noise = np.abs(rng.normal(0, vol / 2, n))
+    hoch = pd.concat([open_, close], axis=1).max(axis=1) * (1 + noise)
+    tief = pd.concat([open_, close], axis=1).min(axis=1) * (1 - noise)
+
     return pd.DataFrame(
         {
-            "open": (close.shift(1) * (1 + rng.normal(0, vol / 4, n))).bfill(),
-            "high": close * (1 + noise),
-            "low": close * (1 - noise),
+            "open": open_,
+            "high": hoch,
+            "low": tief,
             "close": close,
             "adj_close": close,
             "volume": rng.integers(200_000, 2_000_000, n).astype(float),
         },
-        index=close.index,
+        index=index,
     )
 
 
 def trending_series(n: int = 900, seed: int = 1) -> pd.DataFrame:
     """Klarer Aufwaertstrend - erfuellt die Pflichtfilter der Long-Profile."""
     return make_series(n=n, drift=0.0012, vol=0.011, seed=seed)
+
+
+def trending_session_series(n: int = 400, ende: str = "2026-09-14", seed: int = 1) -> pd.DataFrame:
+    """Aufwaertstrend, der auf einem festen Datum endet.
+
+    Fuer Pruefungen, die vom Abstand zum heutigen Tag abhaengen.
+    """
+    frame = trending_series(n=n, seed=seed)
+    frame.index = pd.date_range(end=pd.Timestamp(ende), periods=n, freq="B")
+    return frame
 
 
 @pytest.fixture(autouse=True)
@@ -73,7 +93,8 @@ def kein_netzzugriff(monkeypatch):
 
     for klasse in (YFinanceProvider, StooqProvider):
         monkeypatch.setattr(klasse, "fetch_bars", verboten)
-    monkeypatch.setattr(YFinanceProvider, "fetch_fx", verboten)
+    for methode in ("fetch_fx", "fetch_quotes", "fetch_earnings_date"):
+        monkeypatch.setattr(YFinanceProvider, methode, verboten)
 
 
 @pytest.fixture
@@ -118,11 +139,16 @@ def seeded(conn, settings):
     InstrumentRepo(conn).upsert_many(instruments)
 
     bars = BarRepo(conn)
+    # Die Reihen enden am letzten Werktag, nicht irgendwann in der
+    # Vergangenheit: Die Fixture soll einen frisch aktualisierten Cache
+    # darstellen. Eine zwei Jahre alte Reihe wuerde die
+    # Datenqualitaetspruefung zu Recht als veraltet melden.
+    index = pd.bdate_range(end=pd.Timestamp(date.today()) - pd.offsets.BDay(1), periods=900)
     for number, instrument in enumerate(instruments):
         frame = trending_series(seed=number + 1)
+        frame.index = index
         bars.upsert(instrument.isin, "yfinance", frame)
 
-    index = trending_series(seed=1).index
     FxRepo(conn).upsert("USD", pd.Series(1.08, index=index))
     return conn
 

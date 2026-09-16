@@ -64,6 +64,8 @@ class InstrumentRepo:
             currency=r["currency"], exchange=r["exchange"] or "",
             tr_status=TRStatus(r["tr_status"]), tr_checked_at=_to_date(r["tr_checked_at"]),
             source=r["source"] or "", notes=r["notes"] or "",
+            next_earnings=_to_date(_spalte(r, "next_earnings")),
+            earnings_checked_at=_to_date(_spalte(r, "earnings_checked_at")),
         )
 
     def get(self, isin: str) -> Instrument | None:
@@ -96,6 +98,46 @@ class InstrumentRepo:
                 "UPDATE instruments SET tr_status = ?, tr_checked_at = ? WHERE isin = ?",
                 (str(status), date.today().isoformat(), isin),
             )
+
+    def set_earnings(self, isin: str, termin: date | None) -> None:
+        """Termin merken - auch ein leeres Ergebnis.
+
+        Sonst wuerde jeder Lauf erneut nach Titeln fragen, fuer die die Quelle
+        ohnehin nichts liefert (ETFs, Indizes, viele europaeische Nebenwerte).
+        """
+        with self.conn:
+            self.conn.execute(
+                "UPDATE instruments SET next_earnings = ?, earnings_checked_at = ? "
+                "WHERE isin = ?",
+                (termin.isoformat() if termin else None, date.today().isoformat(), isin),
+            )
+
+    def needs_earnings_refresh(self, max_age_days: int, limit: int = 60) -> list[Instrument]:
+        """Titel, deren Termin fehlt oder veraltet ist.
+
+        Begrenzt, damit ein Screening-Lauf nicht an hunderten Zusatzabrufen
+        haengt. Ueber mehrere Laeufe ist die Liste trotzdem schnell vollstaendig.
+        """
+        cutoff = (pd.Timestamp.today() - pd.Timedelta(days=max_age_days)).date().isoformat()
+        rows = self.conn.execute(
+            "SELECT * FROM instruments WHERE asset_class = 'stock' "
+            "AND ticker_yahoo IS NOT NULL AND ticker_yahoo <> '' "
+            "AND tr_status IN ('verified','assumed') "
+            "AND (earnings_checked_at IS NULL OR earnings_checked_at < ? "
+            "     OR (next_earnings IS NOT NULL AND next_earnings < ?)) "
+            "ORDER BY earnings_checked_at IS NOT NULL, earnings_checked_at LIMIT ?",
+            (cutoff, date.today().isoformat(), limit),
+        ).fetchall()
+        return [self._row_to_instrument(r) for r in rows]
+
+    def upcoming_earnings(self, within_days: int = 14) -> list[Instrument]:
+        grenze = (pd.Timestamp.today() + pd.Timedelta(days=within_days)).date().isoformat()
+        rows = self.conn.execute(
+            "SELECT * FROM instruments WHERE next_earnings IS NOT NULL "
+            "AND next_earnings >= ? AND next_earnings <= ? ORDER BY next_earnings",
+            (date.today().isoformat(), grenze),
+        ).fetchall()
+        return [self._row_to_instrument(r) for r in rows]
 
     def stale_checks(self, days: int) -> list[Instrument]:
         """Eintraege, deren TR-Pruefung zu alt ist. Produkte verschwinden aus dem
@@ -287,6 +329,9 @@ class SignalRepo:
                 s.as_of.isoformat(), int(s.provisional),
                 json.dumps(_hits_as_dicts(s.hits), ensure_ascii=False),
                 json.dumps(s.metrics, ensure_ascii=False),
+                s.quality,
+                json.dumps(s.quality_notes, ensure_ascii=False),
+                s.earnings_date.isoformat() if s.earnings_date else None,
             )
             for s in signals
         ]
@@ -295,7 +340,8 @@ class SignalRepo:
         with self.conn:
             self.conn.executemany(
                 "INSERT INTO signals (run_id,isin,strategy,horizon,direction,score,as_of,"
-                "provisional,hits,metrics) VALUES (?,?,?,?,?,?,?,?,?,?) "
+                "provisional,hits,metrics,quality,quality_notes,earnings_date) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) "
                 "ON CONFLICT(run_id,isin,strategy) DO UPDATE SET score = excluded.score",
                 rows,
             )
@@ -319,6 +365,9 @@ class SignalRepo:
                     metrics=json.loads(r["metrics"] or "{}"),
                     tr_status=TRStatus(r["tr_status"] or "unknown"),
                     provisional=bool(r["provisional"]),
+                    quality=_spalte(r, "quality") or "ok",
+                    quality_notes=json.loads(_spalte(r, "quality_notes") or "[]"),
+                    earnings_date=_to_date(_spalte(r, "earnings_date")),
                 )
             )
         return out
@@ -357,6 +406,14 @@ def _hits_as_dicts(hits: list[RuleHit]) -> list[dict]:
          "weight": h.weight, "required": h.required}
         for h in hits
     ]
+
+
+def _spalte(row: sqlite3.Row, name: str):
+    """Spalte lesen, die in aelteren Datenbanken fehlen kann."""
+    try:
+        return row[name]
+    except (IndexError, KeyError):
+        return None
 
 
 def _f(value) -> float | None:

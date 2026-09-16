@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/poll.js" defer></script>
 </head>
-<body>
+<body data-kurs-intervall="{{ kurs_status.intervall if kurs_status.aktiv else 0 }}">
 <header class="topbar">
   <a class="brand" href="/">Trading-Tool</a>
   <nav>
@@ -16,6 +16,7 @@
     {% endfor %}
     <a href="/watchlist">Watchlist</a>
     <a href="/universe">Universum</a>
+    <a href="/datenqualitaet">Datenqualität</a>
     <a href="/einstellungen">Einstellungen</a>
   </nav>
 </header>

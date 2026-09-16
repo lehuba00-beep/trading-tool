@@ -91,6 +91,40 @@ class ScreeningSettings(BaseModel):
     )
 
 
+class QuoteSettings(BaseModel):
+    """Laufend aktualisierte Kurse.
+
+    Ausdruecklich keine Echtzeitkurse: Yahoo liefert je nach Boerse 15 bis 20
+    Minuten verzoegert. Die Oberflaeche weist das aus.
+    """
+
+    enabled: bool = True
+    refresh_seconds: int = 30
+    """Wie oft die Oberflaeche nachfragt."""
+    ttl_seconds: int = 25
+    """Wie lange ein abgerufener Kurs wiederverwendet wird. Knapp unter dem
+    Abfrageintervall, damit die Quelle nicht oefter belastet wird als noetig."""
+    max_symbols: int = 80
+    """Obergrenze je Abruf. Ohne sie waere eine lange Trefferliste der
+    schnellste Weg in die Drosselung."""
+
+
+class EarningsSettings(BaseModel):
+    """Termine fuer Quartalszahlen.
+
+    Yahoo liefert sie unvollstaendig und nicht immer zuverlaessig - deshalb
+    sind sie ein Hinweis, keine Zusicherung.
+    """
+
+    enabled: bool = True
+    max_age_days: int = 7
+    """Nach dieser Zeit wird ein Termin neu abgefragt."""
+    per_run: int = 40
+    """Wie viele Titel je Screening-Lauf nachgefragt werden. Begrenzt, damit
+    der Lauf nicht an hunderten Zusatzabrufen haengt."""
+    warn_within_days: int = 10
+
+
 class UISettings(BaseModel):
     host: str = "127.0.0.1"
     port: int = 0
@@ -103,6 +137,8 @@ class Settings(BaseModel):
     provider: ProviderSettings = Field(default_factory=ProviderSettings)
     schedule: ScheduleSettings = Field(default_factory=ScheduleSettings)
     screening: ScreeningSettings = Field(default_factory=ScreeningSettings)
+    quotes: QuoteSettings = Field(default_factory=QuoteSettings)
+    earnings: EarningsSettings = Field(default_factory=EarningsSettings)
     ui: UISettings = Field(default_factory=UISettings)
 
     # Pfade, zur Laufzeit gesetzt

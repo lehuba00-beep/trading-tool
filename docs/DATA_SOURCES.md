@@ -139,3 +139,78 @@ der importierten Liste passende Produkte vor. Nur Stammdaten, keine laufenden
 Kurse – damit bleibt die Lösung rechtlich und technisch unkritisch. Ein echter
 Live-Kursfeed für Hebelprodukte ist ohne kostenpflichtige Vereinbarung mit
 einem Datenanbieter realistisch nicht zu haben.
+
+## 4. Laufend aktualisierte Kurse
+
+**Es sind keine Echtzeitkurse.** Yahoo liefert je nach Börse 15 bis 20 Minuten
+verzögert. Echte Realtime-Daten setzen einen lizenzierten, kostenpflichtigen
+Feed voraus — Börsen verkaufen Realtime-Berechtigungen einzeln, und kein
+kostenloser Anbieter darf sie weitergeben. Wer Realtime braucht, kommt an einem
+Bezahlabo nicht vorbei.
+
+Was das Werkzeug stattdessen tut: Es holt in regelmäßigen Abständen den
+aktuellsten verfügbaren Kurs und zeigt ihn **mit Abrufzeitpunkt und
+Verzögerungshinweis** an. Ein Kurs, der so aussieht wie Realtime, aber keiner
+ist, wäre gefährlicher als gar keiner.
+
+Zwei Eigenschaften machen das alltagstauglich, ohne die Quelle zu überlasten:
+
+* **Gebündelter Abruf.** Alle sichtbaren Titel werden in *einer* Anfrage geholt.
+  Eine Trefferliste mit 50 Zeilen würde die Quelle sonst binnen Minuten drosseln.
+* **Zwischenspeicher mit Verfallszeit** (Vorgabe 25 Sekunden, knapp unter dem
+  Abfrageintervall von 30 Sekunden). Die Oberfläche darf häufiger fragen, als
+  die Quelle verträgt.
+
+Technisch werden Tagesbalken statt Minutendaten abgerufen: Der Balken des
+laufenden Handelstages wird von Yahoo während der Sitzung fortgeschrieben und
+liefert damit Kurs *und* Vortagesschluss für die Veränderung — in einer Abfrage
+statt in zweien.
+
+Scheitert der Abruf, bleiben die Schlusskurse stehen und die Statuszeile sagt
+es. Ein fehlender Wechselkurs führt dazu, dass gar kein Live-Kurs angezeigt wird
+statt eines falsch umgerechneten.
+
+## 5. Termine für Quartalszahlen
+
+Das Regelwerk kennt nur Kurse. Ein Ausbruchssignal zwei Tage vor Quartalszahlen
+ist ein Münzwurf, den kein Indikator erkennen kann. Deshalb wird der nächste
+Termin je Titel mitgeführt und gewarnt, wenn er in die geplante Haltedauer der
+jeweiligen Strategie fällt.
+
+Die Daten kommen aus derselben Quelle und sind **unvollständig**: Für ETFs und
+Indizes gibt es keine Termine, für manche Nebenwerte auch nicht, und geschätzte
+Termine verschieben sich. Sie sind ein Hinweis, keine Zusicherung — was sich
+nicht zweifelsfrei in ein Datum übersetzen lässt, gilt als unbekannt. Ein falsch
+geratener Termin wäre schlechter als gar keiner.
+
+Abgefragt wird begrenzt (Vorgabe 40 Titel je Lauf, Auffrischung nach sieben
+Tagen), weil jeder Termin ein eigener Abruf ist. Über mehrere Läufe ist die
+Liste trotzdem schnell vollständig. Auch ein leeres Ergebnis wird vermerkt, sonst
+fragt jeder Lauf erneut nach Titeln, für die die Quelle ohnehin nichts hat.
+
+## 6. Datenqualität
+
+Die kostenlosen Quellen liefern gelegentlich fehlerhafte Einzelkurse. Ein
+falscher Ausreißer nach oben erzeugt ein makelloses Donchian-Ausbruchssignal —
+der Screener kann nicht wissen, dass dieser Kurs nie gehandelt wurde. Ebenso
+still ist eine Reihe, die vor drei Wochen aufgehört hat zu laufen: Alle
+Indikatoren rechnen weiter, nur eben auf altem Stand.
+
+Geprüft wird auf:
+
+| Befund | Erkennung |
+|---|---|
+| **Veraltet** | Letzter Balken älter als fünf Handelstage |
+| **Verdächtiger Kurssprung** | Sprung über 20 %, bei dem der Kurs am Folgetag wieder nahe am Ausgangsniveau liegt |
+| **Widersprüchlicher Balken** | Hoch unter Tief, Schluss oder Eröffnung außerhalb der Tagesspanne |
+| **Eingefrorene Reihe** | Zehn Tage oder mehr ohne Kursänderung |
+| **Lücken** | Weniger als 85 % der Handelstage im Zeitraum vorhanden |
+| **Fehlendes Volumen** | Volumen fehlt an über 30 % der letzten 60 Tage |
+
+Zum Sprung-Kriterium: Verglichen wird das **Kursniveau vor und nach** dem
+Balken, nicht die Summe der Tagesrenditen. Ein Sprung um +45 % und vollständig
+zurück ergibt −31 %, in der Summe also +14 % — das ist Prozentarithmetik, kein
+Restfehler. Wer darauf schwellt, übersieht genau die großen Ausreißer.
+
+Titel mit Befund werden **markiert, nicht aussortiert**. Stilles Weglassen würde
+genau die Information verbergen, um derentwillen geprüft wird.

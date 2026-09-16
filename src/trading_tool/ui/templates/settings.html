@@ -35,6 +35,42 @@
 </section>
 </div>
 
+<div class="split">
+<section class="card">
+  <h2>Laufende Kursaktualisierung</h2>
+  <table class="kv">
+    <tr><th>Aktiv</th><td>{{ 'ja' if settings.quotes.enabled else 'nein' }}</td></tr>
+    <tr><th>Abfrageintervall</th><td>{{ settings.quotes.refresh_seconds }} Sekunden</td></tr>
+    <tr><th>Zwischenspeicher</th><td>{{ settings.quotes.ttl_seconds }} Sekunden</td></tr>
+    <tr><th>Titel je Abruf</th><td>höchstens {{ settings.quotes.max_symbols }}</td></tr>
+    <tr><th>Stand</th><td>{{ kurs_status.abgerufen or '-' }}
+      {% if kurs_status.fehler %}<span class="neg">({{ kurs_status.fehler }})</span>{% endif %}</td></tr>
+  </table>
+  <p class="muted small">
+    <strong>Keine Echtzeitkurse.</strong> Yahoo liefert je nach Börse 15 bis 20
+    Minuten verzögert; echte Realtime-Kurse gibt es nur über einen lizenzierten,
+    kostenpflichtigen Feed. Angezeigt wird der aktuellste verfügbare Kurs samt
+    Abrufzeitpunkt. Alle Abrufe laufen gebündelt und über einen
+    Zwischenspeicher, damit die Quelle nicht drosselt.
+  </p>
+</section>
+
+<section class="card">
+  <h2>Quartalstermine</h2>
+  <table class="kv">
+    <tr><th>Aktiv</th><td>{{ 'ja' if settings.earnings.enabled else 'nein' }}</td></tr>
+    <tr><th>Erneut abfragen nach</th><td>{{ settings.earnings.max_age_days }} Tagen</td></tr>
+    <tr><th>Titel je Lauf</th><td>{{ settings.earnings.per_run }}</td></tr>
+  </table>
+  <p class="muted small">
+    Termine kommen aus derselben Datenquelle und sind unvollständig &ndash; für
+    ETFs und Indizes gibt es keine, für manche Nebenwerte auch nicht. Sie sind
+    ein Hinweis, keine Zusicherung. Gewarnt wird, wenn ein Termin in die
+    geplante Haltedauer der jeweiligen Strategie fällt.
+  </p>
+</section>
+</div>
+
 <section class="card wide">
   <h2>Ablage</h2>
   <table class="kv">

@@ -17,6 +17,7 @@
   <a class="btn secondary" href="/trefferquote/{{ name }}">Trefferquote</a>
   <a class="btn secondary" href="/screener/{{ name }}?sort={{ sort }}&nur_geprueft={{ 0 if nur_geprueft else 1 }}">
     {{ 'Alle anzeigen' if nur_geprueft else 'Nur TR-geprueft' }}</a>
+  {% if kurs_status.aktiv %}<span id="kurs-stand" class="kurs-stand">Kurse werden geladen …</span>{% endif %}
 </div>
 
 {% if run %}
@@ -34,12 +35,12 @@
     <tr>
       <th><a href="?sort=score">Score</a></th>
       <th><a href="?sort=name">Titel</a></th>
-      <th>Kurs (EUR)</th>
+      <th title="Laufend aktualisiert, verzögert. Alle übrigen Werte stammen aus dem Screening-Lauf.">Kurs (EUR)<span class="th-note">laufend</span></th>
       <th><a href="?sort=perf_20d">20 Tage</a></th>
       <th><a href="?sort=abstand_hoch">zum 52W-Hoch</a></th>
       <th>ATR %</th>
-      <th>Stop</th>
-      <th>Ziel</th>
+      <th title="Aus dem ATR zum Zeitpunkt des Laufs berechnet - nicht laufend angepasst.">Stop</th>
+      <th title="Aus dem ATR zum Zeitpunkt des Laufs berechnet - nicht laufend angepasst.">Ziel</th>
       <th><a href="?sort=umsatz">Umsatz</a></th>
       <th>Ausgeloeste Regeln</th>
       <th>TR</th>
@@ -52,8 +53,21 @@
       <td><span class="score">{{ s.score|zahl(0) }}</span>
         {% if s.provisional %}<span class="tag prov" title="Beruht auf einem noch nicht abgeschlossenen Tagesbalken">vorlaeufig</span>{% endif %}</td>
       <td><a href="/instrument/{{ s.isin }}?strategie={{ name }}">{{ s.name }}</a>
-        <br><span class="muted small">{{ s.isin }}</span></td>
-      <td class="num">{{ s.metrics.get('kurs_eur')|zahl }}</td>
+        <br><span class="muted small">{{ s.isin }}</span>
+        {% if s.quality != 'ok' %}
+          <br><span class="tag {{ s.quality }}"
+            title="{{ s.quality_notes|join(' | ') }}">Daten: {{ s.quality_notes|join(', ') }}</span>
+        {% endif %}
+        {% if s.earnings_within_holding(strategy.risk.max_holding_days) %}
+          <br><span class="tag zahlen"
+            title="Quartalszahlen fallen in die geplante Haltedauer. Das Regelwerk kennt keine Termine.">
+            Zahlen in {{ s.earnings_in_days() }} Tagen</span>
+        {% endif %}
+      </td>
+      <td class="num" data-kurs="{{ s.isin }}">
+        <span class="kurs-wert">{{ s.metrics.get('kurs_eur')|zahl }}</span>
+        <span class="kurs-delta"></span>
+      </td>
       <td class="num {{ 'pos' if (s.metrics.get('perf_20d_pct') or 0) > 0 else 'neg' }}">
         {{ s.metrics.get('perf_20d_pct')|zahl(1) }} %</td>
       <td class="num">{{ s.metrics.get('abstand_52w_hoch_pct')|zahl(1) }} %</td>
